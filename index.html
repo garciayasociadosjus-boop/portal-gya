@@ -1,744 +1,166 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Planilla de Clientes - Jurídico</title>
-    <style>
-        :root {
-            --primary-color: #003366; /* Azul oscuro */
-            --secondary-color: #f4f4f4; /* Gris claro */
-            --accent-color: #d4a017; /* Dorado/Mostaza */
-            --text-color: #333;
-            --white-color: #fff;
-            --danger-color: #dc3545;
-            --success-color: #198754;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: var(--secondary-color);
-            color: var(--text-color);
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: var(--white-color);
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-
-        h1, h2 {
-            color: var(--primary-color);
-            border-bottom: 2px solid var(--accent-color);
-            padding-bottom: 10px;
-        }
-
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        label {
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-
-        input, textarea, select {
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 16px;
-        }
-
-        textarea {
-            resize: vertical;
-            min-height: 80px;
-        }
-
-        .btn {
-            padding: 10px 15px;
-            border: none;
-            border-radius: 4px;
-            color: var(--white-color);
-            cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.3s;
-        }
-
-        .btn-primary { background-color: var(--primary-color); }
-        .btn-primary:hover { background-color: #002244; }
-
-        .btn-success { background-color: var(--success-color); }
-        .btn-success:hover { background-color: #146c43; }
-        
-        .btn-warning { background-color: #ffc107; color: #000; }
-        .btn-warning:hover { background-color: #ffca2c; }
-
-        .btn-danger { background-color: var(--danger-color); }
-        .btn-danger:hover { background-color: #b02a37; }
-        
-        .btn-secondary { background-color: #6c757d; }
-        .btn-secondary:hover { background-color: #5c636a; }
-
-        .actions {
-            margin-top: 20px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        #clientList {
-            margin-top: 30px;
-        }
-
-        .client-card {
-            background: #f9f9f9;
-            border: 1px solid #eee;
-            border-left: 5px solid var(--primary-color);
-            padding: 15px;
-            margin-bottom: 10px;
-            border-radius: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        
-        .client-card.urgente {
-            border-left-color: var(--danger-color);
-            background-color: #fff3f4;
-        }
-
-        .client-info {
-            flex-grow: 1;
-        }
-        
-        .client-info h3 {
-            margin: 0 0 10px 0;
-            color: var(--primary-color);
-        }
-        
-        .client-info p {
-            margin: 4px 0;
-            font-size: 14px;
-        }
-
-        .client-actions {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        
-        .search-bar {
-            margin-bottom: 20px;
-            display: flex;
-            gap: 10px;
-        }
-        .search-bar input {
-            flex-grow: 1;
-        }
-        
-        #driveStatus {
-            margin: 10px 0;
-            padding: 10px;
-            border-radius: 4px;
-            display: none;
-            text-align: center;
-        }
-        
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.5);
-        }
-        .modal.active {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .modal-content {
-            background-color: #fefefe;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 80%;
-            max-width: 600px;
-            border-radius: 8px;
-            position: relative;
-        }
-        .close-btn {
-            color: #aaa;
-            position: absolute;
-            top: 10px;
-            right: 20px;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .spinner {
-            border: 4px solid rgba(0, 0, 0, 0.1);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            border-left-color: var(--primary-color);
-            animation: spin 1s ease infinite;
-            margin: 20px auto;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        #documentList {
-            list-style: none;
-            padding: 0;
-        }
-        #documentList li {
-            padding: 8px;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-    </style>
-</head>
-<body>
-
-    <div class="container">
-        <h1>Planilla de Clientes - Estudio Jurídico</h1>
-        
-        <div class="actions">
-            <button id="connectDriveBtn" class="btn btn-primary">Conectar con Google Drive</button>
-            <button id="saveToDriveBtn" class="btn btn-success" style="display:none;">Guardar en Drive</button>
-            <button id="loadFromDriveBtn" class="btn btn-warning" style="display:none;">Cargar desde Drive</button>
-        </div>
-        <div id="driveStatus"></div>
-
-        <h2>Gestión de Cliente</h2>
-        <form id="clientForm" class="form-grid">
-            <input type="hidden" id="clientId">
-            <div class="form-group">
-                <label for="nombre">Nombre Completo</label>
-                <input type="text" id="nombre" required>
-            </div>
-            <div class="form-group">
-                <label for="dni">DNI/CUIT</label>
-                <input type="text" id="dni">
-            </div>
-            <div class="form-group">
-                <label for="telefono">Teléfono</label>
-                <input type="tel" id="telefono">
-            </div>
-            <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email">
-            </div>
-            <div class="form-group">
-                <label for="domicilio">Domicilio</label>
-                <input type="text" id="domicilio">
-            </div>
-            <div class="form-group">
-                <label for="causa">Causa / Asunto</label>
-                <input type="text" id="causa">
-            </div>
-            <div class="form-group">
-                <label for="juzgado">Juzgado / Jurisdicción</label>
-                <input type="text" id="juzgado">
-            </div>
-            <div class="form-group">
-                <label for="fechaVencimiento">Próximo Vencimiento</label>
-                <input type="date" id="fechaVencimiento">
-            </div>
-            <div class="form-group" style="grid-column: 1 / -1;">
-                <label for="notas">Notas / Próximos Pasos</label>
-                <textarea id="notas"></textarea>
-            </div>
-        </form>
-        <div class="actions">
-            <button id="saveBtn" class="btn btn-primary">Guardar Cliente</button>
-            <button id="newBtn" class="btn btn-secondary" style="display: none;">Nuevo Cliente</button>
-            <button id="exportBtn" class="btn btn-success">Exportar a Excel</button>
-        </div>
-
-        <h2>Listado de Clientes</h2>
-        <div class="search-bar">
-            <input type="text" id="searchInput" placeholder="Buscar por nombre, DNI o causa...">
-        </div>
-        <div id="clientList"></div>
-    </div>
+<script>
+    // --- Tus claves y configuración ---
+    const CLIENT_ID = '976943805178-1r5pvivhpstfnjp41eoolopo0kvb1cif.apps.googleusercontent.com';
+    const API_KEY = 'AIzaSyDSMwMM31JM4ZNqRezhH-8uxaE1GVOjrrM';
+    const FOLDER_ID = '15YqcN5SUx-Ba4vqy0ey9eubVQuh3XoVP'; // <-- El ID de tu carpeta "Planillas Jurídicas"
     
-    <!-- Modal para Documentos -->
-    <div id="documentModal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn" onclick="closeDocumentModal()">&times;</span>
-            <h3 id="documentModalTitle">Documentos</h3>
-            <ul id="documentList"></ul>
-            <div class="actions">
-                <input type="file" id="documentUploadInput" style="display:none;">
-                <button class="btn btn-primary" onclick="triggerDocumentUpload()">Subir Documento</button>
-            </div>
-        </div>
-    </div>
+    // --- Constantes de la API de Google ---
+    const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
+    const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+    const fileName = 'planilla_datos.json';
+    
+    // --- Variables de estado ---
+    let tokenClient;
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script>
-    // <!-- ======================================================= -->
-    // <!-- === LÓGICA DE LA APLICACIÓN (CLIENTES, FORMULARIO) === -->
-    // <!-- ======================================================= -->
-    const clientForm = document.getElementById('clientForm');
-    const saveBtn = document.getElementById('saveBtn');
-    const newBtn = document.getElementById('newBtn');
-    const exportBtn = document.getElementById('exportBtn');
-    const clientList = document.getElementById('clientList');
-    const searchInput = document.getElementById('searchInput');
+    // --- Funciones de Carga e Inicio ---
+    function gapiLoaded() {
+        gapi.load('client', initializeGapiClient);
+    }
 
-    let clientsData = JSON.parse(localStorage.getItem('clientsData')) || [];
-    let editingClientId = null;
+    async function initializeGapiClient() {
+        await gapi.client.init({
+            apiKey: API_KEY,
+            discoveryDocs: DISCOVERY_DOCS,
+        });
+    }
 
-    const renderClient = (client) => {
-        const isUrgente = client.fechaVencimiento && new Date(client.fechaVencimiento) < new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000);
-        const cardClass = isUrgente ? 'client-card urgente' : 'client-card';
+    function gisLoaded() {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: SCOPES,
+            callback: '', // Se define dinámicamente
+        });
+    }
 
-        return `
-            <div class="${cardClass}" data-id="${client.id}">
-                <div class="client-info">
-                    <h3>${client.nombre}</h3>
-                    <p><strong>DNI/CUIT:</strong> ${client.dni || 'No especificado'}</p>
-                    <p><strong>Causa:</strong> ${client.causa || 'No especificada'}</p>
-                    <p><strong>Vencimiento:</strong> ${client.fechaVencimiento ? new Date(client.fechaVencimiento).toLocaleDateString() : 'No especificado'}</p>
-                </div>
-                <div class="client-actions">
-                    <button class="btn btn-secondary" onclick="viewClient('${client.id}')">Ver/Editar</button>
-                    <button class="btn btn-primary" onclick="showDocumentModal('${client.id}')">Documentos</button>
-                    <button class="btn btn-danger" onclick="deleteClient('${client.id}')">Eliminar</button>
-                </div>
-            </div>
-        `;
-    };
-
-    const renderAll = () => {
-        const searchTerm = searchInput.value.toLowerCase();
-        const filteredClients = clientsData.filter(c => 
-            c.nombre.toLowerCase().includes(searchTerm) ||
-            (c.dni && c.dni.toLowerCase().includes(searchTerm)) ||
-            (c.causa && c.causa.toLowerCase().includes(searchTerm))
-        );
-        clientList.innerHTML = filteredClients.map(renderClient).join('');
-    };
-
-    const saveData = () => {
-        localStorage.setItem('clientsData', JSON.stringify(clientsData));
-    };
-
-    const resetForm = () => {
-        clientForm.reset();
-        editingClientId = null;
-        saveBtn.textContent = 'Guardar Cliente';
-        newBtn.style.display = 'none';
-    };
-
-    clientForm.addEventListener('submit', (e) => e.preventDefault());
-
-    saveBtn.addEventListener('click', () => {
-        const clientData = {
-            id: editingClientId || `client_${new Date().getTime()}`,
-            nombre: document.getElementById('nombre').value,
-            dni: document.getElementById('dni').value,
-            telefono: document.getElementById('telefono').value,
-            email: document.getElementById('email').value,
-            domicilio: document.getElementById('domicilio').value,
-            causa: document.getElementById('causa').value,
-            juzgado: document.getElementById('juzgado').value,
-            fechaVencimiento: document.getElementById('fechaVencimiento').value,
-            notas: document.getElementById('notas').value,
+    // --- Funciones de Autenticación y Botones ---
+    function handleAuthClick() {
+        tokenClient.callback = async (resp) => {
+            if (resp.error !== undefined) {
+                throw (resp);
+            }
+            document.getElementById('signout_button').style.visibility = 'visible';
+            document.getElementById('authorize_button').style.visibility = 'hidden';
+            await loadData();
         };
 
-        if (!clientData.nombre) {
-            alert('El nombre es obligatorio.');
-            return;
-        }
-
-        if (editingClientId) {
-            const index = clientsData.findIndex(c => c.id === editingClientId);
-            clientsData[index] = clientData;
+        if (gapi.client.getToken() === null) {
+            tokenClient.requestAccessToken({prompt: 'consent'});
         } else {
-            clientsData.push(clientData);
-        }
-
-        saveData();
-        renderAll();
-        resetForm();
-    });
-
-    newBtn.addEventListener('click', resetForm);
-    searchInput.addEventListener('input', renderAll);
-
-    window.viewClient = (id) => {
-        const client = clientsData.find(c => c.id === id);
-        if (client) {
-            document.getElementById('clientId').value = client.id;
-            document.getElementById('nombre').value = client.nombre;
-            document.getElementById('dni').value = client.dni;
-            document.getElementById('telefono').value = client.telefono;
-            document.getElementById('email').value = client.email;
-            document.getElementById('domicilio').value = client.domicilio;
-            document.getElementById('causa').value = client.causa;
-            document.getElementById('juzgado').value = client.juzgado;
-            document.getElementById('fechaVencimiento').value = client.fechaVencimiento;
-            document.getElementById('notas').value = client.notas;
-
-            editingClientId = id;
-            saveBtn.textContent = 'Actualizar Cliente';
-            newBtn.style.display = 'inline-block';
-            window.scrollTo(0, 0);
-        }
-    };
-
-    window.deleteClient = (id) => {
-        if (confirm('¿Estás seguro de que quieres eliminar este cliente? Esta acción no se puede deshacer.')) {
-            clientsData = clientsData.filter(c => c.id !== id);
-            saveData();
-            renderAll();
-            if(id === editingClientId) resetForm();
-        }
-    };
-    
-    function createBackup() {
-        try {
-            const backupData = localStorage.getItem('clientsData');
-            if (backupData) {
-                const blob = new Blob([backupData], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `backup_planilla_${new Date().toISOString().slice(0,10)}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-            }
-        } catch(e) {
-            console.error("No se pudo crear el respaldo:", e);
+            tokenClient.requestAccessToken({prompt: ''});
         }
     }
 
-    exportBtn.addEventListener('click', () => {
-        const worksheet = XLSX.utils.json_to_sheet(clientsData);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Clientes');
-        XLSX.writeFile(workbook, 'Planilla_Clientes.xlsx');
-    });
-
-    document.addEventListener('DOMContentLoaded', renderAll);
-    
-    // --- Lógica del Modal ---
-    window.closeDocumentModal = () => document.getElementById('documentModal').classList.remove('active');
-    </script>
-    
-    <!-- ======================================================= -->
-    <!-- === SECCIÓN DE CÓDIGO DE GOOGLE DRIVE (NO TOCAR) === -->
-    <!-- ======================================================= -->
-    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
-    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
-    <script>
-        // <!-- ⚠️ NO TOCAR ⚠️ -->
-        // ESTAS SON LAS CLAVES CORRECTAS QUE ESTABAN ANTES
-        const CLIENT_ID = '976943805178-1r5pvivhpstfnjp4leoolopo0kvb1cif.apps.googleusercontent.com';
-        const API_KEY = 'AIzaSyDSMWMM3lJM4ZNqRezhH-8uxaE1GVOjrrM';
-        
-        const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
-        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
-        const DATA_FILE_NAME = 'datos_planilla_juridica.json';
-        const DOCS_FOLDER_NAME = 'Planilla_Juridica_Documentos';
-
-        let tokenClient;
-        let gapiInited = false;
-        let gisInited = false;
-        let dataFileId = null;
-        let docsFolderId = null;
-        let currentClientIdForDocs = null;
-
-        const driveStatusEl = document.getElementById('driveStatus');
-        const connectDriveBtn = document.getElementById('connectDriveBtn');
-        const saveToDriveBtn = document.getElementById('saveToDriveBtn');
-        const loadFromDriveBtn = document.getElementById('loadFromDriveBtn');
-
-        function gapiLoaded() { gapi.load('client', initializeGapiClient); }
-        async function initializeGapiClient() {
-            await gapi.client.init({ apiKey: API_KEY, discoveryDocs: [DISCOVERY_DOC] });
-            gapiInited = true;
-            maybeEnableButtons();
+    function handleSignOutClick() {
+        const token = gapi.client.getToken();
+        if (token !== null) {
+            google.accounts.oauth2.revoke(token.access_token);
+            gapi.client.setToken('');
+            document.getElementById('dataForm').reset();
+            document.getElementById('status').textContent = 'Sesión cerrada. Conéctate para empezar.';
+            document.getElementById('authorize_button').style.visibility = 'visible';
+            document.getElementById('signout_button').style.visibility = 'hidden';
         }
-        function gisLoaded() {
-            tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: SCOPES,
-                callback: '', 
+    }
+
+    // --- Funciones de Datos (Cargar y Guardar) ---
+    async function loadData() {
+        try {
+            document.getElementById('status').textContent = 'Buscando archivo en Drive...';
+            // Buscar el archivo SÓLO dentro de la carpeta especificada
+            const response = await gapi.client.drive.files.list({
+                q: `name='${fileName}' and '${FOLDER_ID}' in parents and trashed=false`,
+                fields: 'files(id, name)',
+                spaces: 'drive'
             });
-            gisInited = true;
-            maybeEnableButtons();
-        }
-        function maybeEnableButtons() {
-            if (gapiInited && gisInited) {
-                connectDriveBtn.onclick = handleAuthClick;
-            }
-        }
-        function updateDriveStatus(message, isConnected = false) {
-            driveStatusEl.style.display = 'block';
-            driveStatusEl.textContent = message;
-            driveStatusEl.style.background = isConnected ? '#d1e7dd' : '#fff3cd';
-            driveStatusEl.style.color = isConnected ? '#0f5132' : '#664d03';
-        }
 
-        function handleAuthClick() {
-            tokenClient.callback = async (resp) => {
-                if (resp.error) throw (resp);
-                updateDriveStatus('✅ Conectado a Google Drive', true);
-                connectDriveBtn.style.display = 'none';
-                saveToDriveBtn.style.display = 'inline-block';
-                loadFromDriveBtn.style.display = 'inline-block';
-                saveToDriveBtn.onclick = saveDataToDrive;
-                loadFromDriveBtn.onclick = loadDataFromDrive;
-                await findDataFile();
-            };
-            if (gapi.client.getToken() === null) {
-                tokenClient.requestAccessToken({prompt: 'consent'});
-            } else {
-                tokenClient.requestAccessToken({prompt: ''});
-            }
-        }
-
-        async function findDataFile() {
-            updateDriveStatus('Buscando archivo de datos en Drive...', false);
-            try {
-                const response = await gapi.client.drive.files.list({
-                    q: `name='${DATA_FILE_NAME}' and trashed=false`,
-                    fields: 'files(id, name)',
-                    spaces: 'drive'
-                });
-                if (response.result.files.length > 0) {
-                    dataFileId = response.result.files[0].id;
-                    updateDriveStatus(`✅ Archivo de datos encontrado. Listo para operar.`, true);
-                } else {
-                    updateDriveStatus(`⚠️ Archivo de datos no encontrado. Se creará al guardar.`, false);
-                    dataFileId = null;
-                }
-            } catch (err) {
-                console.error("Error buscando archivo de datos:", err);
-                alert('Error al buscar el archivo de datos en Google Drive.');
-                updateDriveStatus(`❌ Error al conectar con Drive.`, false);
-            }
-        }
-        
-        async function saveDataToDrive() {
-            if (!confirm('¿Quieres guardar los datos actuales en Google Drive?')) return;
-            const content = JSON.stringify(clientsData, null, 2);
-            updateDriveStatus('Guardando datos en Drive...', false);
-            try {
-                // Reutilizamos la función de subida genérica
-                const fileMetadata = await uploadFileContent(content, DATA_FILE_NAME, 'application/json', null, dataFileId);
-                dataFileId = fileMetadata.id;
-                updateDriveStatus('✅ ¡Datos guardados en Google Drive con éxito!', true);
-                alert('¡Datos guardados en Google Drive con éxito!');
-            } catch (err) {
-                console.error("Error guardando datos en Drive:", err);
-                updateDriveStatus('❌ Error al guardar datos en Drive.', false);
-                alert('Error al guardar los datos en Google Drive.');
-            }
-        }
-
-        async function loadDataFromDrive() {
-            if (!dataFileId) return alert("No se ha encontrado un archivo de datos en tu Drive. Guarda primero para crear uno.");
-            if (!confirm("¿Seguro? Se reemplazarán los datos actuales con los de Drive. Se creará un respaldo local.")) return;
-            
-            updateDriveStatus('Cargando datos desde Drive...', false);
-            try {
-                const response = await gapi.client.drive.files.get({ fileId: dataFileId, alt: 'media' });
-                const importedData = JSON.parse(response.body);
-                if (!Array.isArray(importedData)) throw new Error('Formato de datos no válido en Drive.');
-                
-                createBackup();
-                clientsData = importedData;
-                saveData();
-                renderAll();
-                
-                updateDriveStatus('✅ Datos cargados desde Drive con éxito.', true);
-                alert('Datos cargados desde Google Drive con éxito.');
-            } catch (err) {
-                console.error("Error cargando datos desde Drive:", err);
-                updateDriveStatus('❌ Error al cargar datos desde Drive.', false);
-                alert('Error al cargar datos desde Google Drive.');
-            }
-        }
-
-        // --- GESTIÓN DE DOCUMENTOS ---
-
-        async function getOrCreateFolder(name, parentId = null) {
-            let query = `mimeType='application/vnd.google-apps.folder' and name='${name}' and trashed=false`;
-            if (parentId) {
-                query += ` and '${parentId}' in parents`;
-            }
-
-            const response = await gapi.client.drive.files.list({ q: query, fields: 'files(id)' });
             if (response.result.files.length > 0) {
-                return response.result.files[0].id;
-            } else {
-                const fileMetadata = { name, mimeType: 'application/vnd.google-apps.folder' };
-                if (parentId) {
-                    fileMetadata.parents = [parentId];
-                }
-                const newFolder = await gapi.client.drive.files.create({ resource: fileMetadata, fields: 'id' });
-                return newFolder.result.id;
-            }
-        }
-
-        async function showDocumentModal(clientId) {
-            if (gapi.client.getToken() === null) return alert('Por favor, conecta con Google Drive primero.');
-            
-            currentClientIdForDocs = clientId;
-            const client = clientsData.find(c => c.id === clientId);
-            if (!client) return;
-
-            document.getElementById('documentModalTitle').innerText = `Documentos de: ${client.nombre}`;
-            document.getElementById('documentModal').classList.add('active');
-            const listEl = document.getElementById('documentList');
-            listEl.innerHTML = '<div class="spinner"></div>';
-
-            try {
-                if (!docsFolderId) docsFolderId = await getOrCreateFolder(DOCS_FOLDER_NAME);
+                const fileId = response.result.files[0].id;
+                document.getElementById('dataForm').setAttribute('data-file-id', fileId);
                 
-                const clientFolderName = `${client.nombre.replace(/[\/\\?%*:|"<>]/g, '-')}_${client.dni}`;
-                const clientFolderId = await getOrCreateFolder(clientFolderName, docsFolderId);
-                
-                const response = await gapi.client.drive.files.list({
-                    q: `'${clientFolderId}' in parents and trashed=false`,
-                    fields: 'files(id, name, webViewLink)'
+                const fileResponse = await gapi.client.drive.files.get({
+                    fileId: fileId,
+                    alt: 'media'
                 });
-
-                if (response.result.files.length === 0) {
-                    listEl.innerHTML = '<li>No hay documentos para este cliente.</li>';
-                } else {
-                    listEl.innerHTML = response.result.files.map(file => `
-                        <li>
-                            <a href="${file.webViewLink}" target="_blank" rel="noopener noreferrer">${file.name}</a>
-                            <button class="btn btn-danger btn-sm" onclick="deleteDocument('${file.id}')">Eliminar</button>
-                        </li>
-                    `).join('');
-                }
-            } catch (err) {
-                console.error("Error gestionando documentos:", err);
-                listEl.innerHTML = '<li>Error al cargar documentos. Revisa la consola.</li>';
-            }
-        }
-        
-        async function deleteDocument(fileId) {
-            if (!confirm('¿Estás seguro de que quieres eliminar este documento de forma permanente?')) return;
-
-            const listEl = document.getElementById('documentList');
-            listEl.innerHTML = '<div class="spinner"></div><p style="text-align:center;">Eliminando archivo...</p>';
-
-            try {
-                await gapi.client.drive.files.delete({ fileId: fileId });
-                alert('Documento eliminado con éxito.');
-                showDocumentModal(currentClientIdForDocs); // Recargar la lista
-            } catch (err) {
-                console.error("Error al eliminar documento:", err);
-                alert('Error al eliminar el documento. Revisa la consola.');
-                showDocumentModal(currentClientIdForDocs); // Recargar igualmente para mostrar el estado actual
-            }
-        }
-
-        function triggerDocumentUpload() {
-            const uploader = document.getElementById('documentUploadInput');
-            uploader.onchange = handleDocumentUpload;
-            uploader.value = ''; // Resetear por si se sube el mismo archivo dos veces
-            uploader.click();
-        }
-
-        async function handleDocumentUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const listEl = document.getElementById('documentList');
-            listEl.innerHTML = '<div class="spinner"></div><p style="text-align:center;">Subiendo archivo, por favor espera...</p>';
-
-            try {
-                if (!docsFolderId) docsFolderId = await getOrCreateFolder(DOCS_FOLDER_NAME);
-                const client = clientsData.find(c => c.id === currentClientIdForDocs);
-                const clientFolderName = `${client.nombre.replace(/[\/\\?%*:|"<>]/g, '-')}_${client.dni}`;
-                const clientFolderId = await getOrCreateFolder(clientFolderName, docsFolderId);
                 
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    await uploadFileContent(e.target.result, file.name, file.type, clientFolderId, null);
-                    alert(`¡Archivo "${file.name}" subido con éxito!`);
-                    showDocumentModal(currentClientIdForDocs);
-                };
-                reader.readAsArrayBuffer(file);
-
-            } catch (err) {
-                console.error("Error al subir documento:", err);
-                alert("Error al subir el archivo. Revisa la consola.");
-                showDocumentModal(currentClientIdForDocs);
+                const data = JSON.parse(fileResponse.body);
+                for (const key in data) {
+                    if (document.getElementById(key)) {
+                        document.getElementById(key).value = data[key];
+                    }
+                }
+                document.getElementById('status').textContent = 'Datos cargados desde la carpeta correcta.';
+            } else {
+                document.getElementById('status').textContent = 'Archivo no encontrado. Se creará uno nuevo al guardar.';
+                document.getElementById('dataForm').removeAttribute('data-file-id');
             }
+        } catch (err) {
+            document.getElementById('status').textContent = 'Error al cargar datos: ' + err.message;
+            console.error(err);
         }
+    }
+
+    async function saveData(event) {
+        event.preventDefault();
+        document.getElementById('status').textContent = 'Guardando...';
+
+        const data = {
+            expediente: document.getElementById('expediente').value,
+            causa: document.getElementById('causa').value,
+            juzgado: document.getElementById('juzgado').value,
+            actor: document.getElementById('actor').value,
+            demandado: document.getElementById('demandado').value,
+            fecha_inicio: document.getElementById('fecha_inicio').value,
+            estado: document.getElementById('estado').value,
+            proximo_paso: document.getElementById('proximo_paso').value,
+            fecha_vencimiento: document.getElementById('fecha_vencimiento').value,
+            observaciones: document.getElementById('observaciones').value,
+        };
+
+        const fileContent = JSON.stringify(data, null, 2);
+        const file = new Blob([fileContent], {type: 'application/json'});
+        const fileId = document.getElementById('dataForm').getAttribute('data-file-id');
+
+        const metadata = {
+            name: fileName,
+            mimeType: 'application/json',
+        };
         
-        function uploadFileContent(content, fileName, mimeType, parentId, fileIdToUpdate) {
-            // Esta función es más robusta y maneja tanto ArrayBuffer como string
-            let contentToUpload, contentTypeForRequest;
-            if (typeof content === 'string') {
-                contentToUpload = content;
-                contentTypeForRequest = mimeType;
-            } else { // Asumimos ArrayBuffer
-                contentToUpload = new Uint8Array(content).reduce((data, byte) => data + String.fromCharCode(byte), '');
-                contentTypeForRequest = mimeType;
+        const formData = new FormData();
+
+        try {
+            if (fileId) { // Si el archivo YA EXISTE, lo actualizamos
+                 formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                 formData.append('file', file);
+
+                 await gapi.client.request({
+                    path: `/upload/drive/v3/files/${fileId}`,
+                    method: 'PATCH',
+                    params: { uploadType: 'multipart' },
+                    body: formData
+                });
+                document.getElementById('status').textContent = '¡Datos actualizados en Drive!';
+
+            } else { // Si el archivo NO EXISTE, lo creamos en la carpeta correcta
+                metadata.parents = [FOLDER_ID]; // <-- La magia está aquí
+                formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                formData.append('file', file);
+                
+                const response = await gapi.client.request({
+                    path: '/upload/drive/v3/files',
+                    method: 'POST',
+                    params: { uploadType: 'multipart' },
+                    body: formData
+                });
+                document.getElementById('dataForm').setAttribute('data-file-id', response.result.id);
+                document.getElementById('status').textContent = '¡Archivo creado y guardado en Drive!';
             }
-
-            const boundary = '-------314159265358979323846';
-            const delimiter = `\r\n--${boundary}\r\n`;
-            const close_delim = `\r\n--${boundary}--`;
-
-            const metadata = { name: fileName, mimeType: mimeType };
-            if (parentId) metadata.parents = [parentId];
-            
-            const multipartRequestBody =
-                delimiter +
-                'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-                JSON.stringify(metadata) +
-                delimiter +
-                `Content-Type: ${contentTypeForRequest}\r\n` +
-                (typeof content === 'string' ? '' : 'Content-Transfer-Encoding: base64\r\n') +
-                '\r\n' +
-                (typeof content === 'string' ? contentToUpload : btoa(contentToUpload)) +
-                close_delim;
-
-            const path = fileIdToUpdate ? `/upload/drive/v3/files/${fileIdToUpdate}` : '/upload/drive/v3/files';
-            const method = fileIdToUpdate ? 'PATCH' : 'POST';
-
-            return gapi.client.request({
-                path: path,
-                method: method,
-                params: { uploadType: 'multipart' },
-                headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
-                body: multipartRequestBody
-            }).then(response => response.result);
+        } catch (err) {
+            document.getElementById('status').textContent = 'Error al guardar: ' + err.message;
+            console.error(err);
         }
+    }
+</script>
 
-    </script>
-</body>
-</html>
+<!-- Scripts de Google que deben ir al final -->
+<script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+<script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
