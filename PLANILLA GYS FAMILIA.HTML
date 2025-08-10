@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planilla Jurídica - García & Asociados</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .header p { font-size: 1.1em; opacity: 0.9; }
+        .main-content { padding: 30px; }
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            border: 1px solid #e0e0e0;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 15px 35px rgba(0,0,0,0.15); }
+        .card h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .icon { width: 24px; height: 24px; fill: currentColor; }
+        .today-reviews { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%); color: white; }
+        .overdue-reviews { background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); color: white; }
+        .pending-reviews { background: linear-gradient(135deg, #feca57 0%, #ff9ff3 100%); color: white; }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4); }
+        .btn-success { background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%); }
+        .btn-info { background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); }
+        .btn-danger { background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); }
+        .btn-warning { background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); }
+        .btn-sm { padding: 8px 16px; font-size: 0.9em; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #2c3e50; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .reviews-list { max-height: 400px; overflow-y: auto; }
+        .review-item {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 0 8px 8px 0;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .review-item-content { flex-grow: 1; cursor: pointer; }
+        .review-item.completed .review-item-content { text-decoration: line-through; opacity: 0.6; }
+        .review-item.completed { border-left-color: #2ecc71; background-color: #f2fdf5; }
+        .review-item:hover { background: #e8f2ff; transform: translateX(5px); }
+        .review-item.today { border-left-color: #e74c3c; background: #fff5f5; }
+        .review-item.overdue { border-left-color: #f39c12; background: #fef9e7; }
+        .review-date { font-weight: 600; color: #2c3e50; font-size: 1.1em; }
+        .review-client { font-size: 1em; color: #667eea; margin: 5px 0; }
+        .review-obs { font-size: 0.9em; color: #666; font-style: italic; }
+        .review-expediente { font-size: 0.85em; color: #27ae60; font-weight: bold; margin: 2px 0; }
+        .complete-btn {
+            background: #e0e0e0;
+            border: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        .complete-btn:hover { background: #c0c0c0; }
+        .review-item.completed .complete-btn { background: #2ecc71; color: white; }
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); z-index: 1000;
+        }
+        .modal.active { display: flex; align-items: center; justify-content: center; }
+        .modal-content {
+            background: white; border-radius: 15px; padding: 30px; width: 90%;
+            max-width: 700px; max-height: 85vh; overflow-y: auto; animation: modalSlide 0.3s ease;
+        }
+        @keyframes modalSlide { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .client-info { background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .client-info h4 { color: #2c3e50; margin-bottom: 15px; font-size: 1.2em; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .info-grid.full-width > .info-item { grid-column: 1 / -1; }
+        .info-item { background: white; padding: 10px; border-radius: 5px; border-left: 3px solid #667eea; }
+        .info-label { font-size: 0.8em; color: #666; text-transform: uppercase; font-weight: 600; }
+        .info-value, .info-value-large { font-size: 1em; color: #2c3e50; margin-top: 2px; }
+        .info-value-large { white-space: pre-wrap; }
+        .editable-field { cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: background-color 0.3s ease; min-height: 20px; }
+        .editable-field:hover { background-color: #e8f4fd; color: #2980b9; }
+        .observations-history { margin-top: 20px; }
+        .obs-item { background: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; margin-bottom: 10px; position: relative; }
+        .obs-date { font-size: 0.9em; color: #667eea; font-weight: 600; margin-bottom: 5px; }
+        .obs-text { color: #2c3e50; }
+        .obs-revision-date { font-size: 0.8em; color: #c0392b; margin-top: 5px; font-weight: 500; }
+        .obs-edit-btn {
+            position: absolute; top: 10px; right: 10px; background: #3498db; color: white;
+            border: none; border-radius: 4px; padding: 4px 8px; font-size: 0.8em; cursor: pointer;
+        }
+        .obs-edit-btn:hover { background: #2980b9; }
+        .obs-actions { display: flex; gap: 10px; margin-top: 10px; justify-content: flex-end; }
+        .close { float: right; font-size: 28px; font-weight: bold; color: #aaa; cursor: pointer; line-height: 1; }
+        .action-buttons { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; justify-content: center; }
+        .data-status {
+            background: #d4edda; border: 1px solid #c3e6cb; color: #155724;
+            padding: 10px; border-radius: 8px; margin-bottom: 20px; text-align: center;
+        }
+        .emergency-recovery {
+            background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24;
+            padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;
+        }
+        .form-section { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin-top: 20px; }
+        .form-section h4 { color: #2c3e50; margin-bottom: 15px; font-size: 1.2em; }
+        .document-list { list-style: none; padding: 0; max-height: 250px; overflow-y: auto; }
+        .document-list li { background: #f1f3f5; padding: 10px; border-radius: 5px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .document-list a { color: #3498db; text-decoration: none; font-weight: 500; word-break: break-all; }
+        .document-list a:hover { text-decoration: underline; }
+        .document-list .btn-sm { flex-shrink: 0; margin-left: 10px; }
+        .document-list .spinner { display: block; margin: 20px auto; width: 30px; height: 30px; border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @media (max-width: 992px) { .dashboard { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) { .info-grid { grid-template-columns: 1fr; } .main-content { padding: 20px; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Planilla Jurídica</h1>
+            <p>García & Asociados - Gestión de Casos y Revisiones</p>
+        </div>
+
+        <div class="main-content">
+            <div id="emergencyRecovery" class="emergency-recovery" style="display: none;"></div>
+            <div id="dataStatus" class="data-status"></div>
+            <div id="driveStatus" class="data-status" style="margin-top: -10px; display: none;"></div>
+
+            <div class="dashboard">
+                <div class="card today-reviews">
+                    <h3><svg class="icon" viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>Revisiones de Hoy</h3>
+                    <div class="reviews-list" id="todayReviews"></div>
+                </div>
+                <div class="card overdue-reviews">
+                    <h3><svg class="icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>Revisiones Vencidas</h3>
+                    <div class="reviews-list" id="overdueReviews"></div>
+                </div>
+                <div class="card pending-reviews">
+                    <h3><svg class="icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>Próximas Revisiones</h3>
+                    <div class="reviews-list" id="upcomingReviews"></div>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin-bottom: 30px;">
+                <button class="btn btn-success" onclick="showNewClientModal()">➕ Agregar Cliente</button>
+                <button class="btn" onclick="showClientSelectorModal()">👥 Ver/Editar Cliente</button>
+                <button class="btn" onclick="exportToExcel()">📊 Exportar a Excel</button>
+                <button class="btn" onclick="exportData()">💾 Exportar JSON</button>
+                <button class="btn btn-warning" onclick="importData()">📥 Importar Datos</button>
+                <button class="btn btn-danger" onclick="cleanupProblematicClient()">🧹 Limpiar Cliente Problemático</button>
+                <!-- BOTONES DE GOOGLE DRIVE -->
+                <button id="connectDriveBtn" class="btn">🔗 Conectar a Drive</button>
+                <button id="saveToDriveBtn" class="btn btn-success" style="display:none;">📤 Guardar en Drive</button>
+                <button id="loadFromDriveBtn" class="btn btn-warning" style="display:none;">📥 Cargar de Drive</button>
+            </div>
+
+            <div class="card">
+                <h3>📅 Todas las Revisiones (Ordenadas por Fecha)</h3>
+                <div class="form-group">
+                    <input type="text" id="searchInput" placeholder="Buscar por DNI, nombre, expediente, etc." onkeyup="filterReviews()">
+                </div>
+                <div class="reviews-list" id="allReviews" style="max-height: 500px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <input type="file" id="importInput" accept=".json" style="display: none;" onchange="handleImport(event)">
+    <input type="file" id="documentUploadInput" style="display: none;">
+
+    <div id="newClientModal" class="modal">
+        <div class="modal-content"></div>
+    </div>
+
+    <div id="clientSelectorModal" class="modal">
+        <div class="modal-content"></div>
+    </div>
+
+    <div id="clientInfoModal" class="modal">
+        <div class="modal-content"></div>
+    </div>
+
+    <div id="documentModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('documentModal')">&times;</span>
+            <h2 id="documentModalTitle">Gestión de Documentos</h2>
+            <ul id="documentList" class="document-list"></ul>
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="btn btn-info" onclick="triggerDocumentUpload()">➕ Subir Nuevo Documento</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        const initialData = [];
+        let clientsData = [];
+        let editingClientId = null, editingField = null, editingObservation = null;
+
+        function recoverData() {
+            const backup = localStorage.getItem('planilla_juridica_data_backup');
+            if (backup) {
+                clientsData = JSON.parse(backup);
+                saveData();
+                renderAll();
+                updateDataStatus('✅ Datos recuperados desde respaldo');
+                document.getElementById('emergencyRecovery').style.display = 'none';
+            } else {
+                alert('❌ No se encontró respaldo disponible');
+            }
+        }
+
+        function cleanupProblematicClient() {
+            const originalLength = clientsData.length;
+            const suspiciousClients = clientsData.filter(c => !c.id || !c.nombre || c.nombre.length < 3 || /<[a-z][\s\S]*>/i.test(c.nombre));
+            if (suspiciousClients.length === 0) return alert('✅ No se encontraron clientes problemáticos.');
+            if (confirm(`🚨 Se encontraron ${suspiciousClients.length} registros posiblemente corruptos. ¿Eliminar?`)) {
+                createBackup();
+                clientsData = clientsData.filter(c => c.id && c.nombre && c.nombre.length >= 3 && !/<[a-z][\s\S]*>/i.test(c.nombre));
+                saveData();
+                renderAll();
+                updateDataStatus(`🧹 ${originalLength - clientsData.length} registro(s) eliminado(s).`);
+            }
+        }
+
+        function createBackup() {
+            try { localStorage.setItem('planilla_juridica_data_backup', JSON.stringify(clientsData)); }
+            catch (e) { console.error("Error al crear el respaldo", e); }
+        }
+
+        function saveData() {
+            try {
+                localStorage.setItem('planilla_juridica_data', JSON.stringify(clientsData));
+                updateDataStatus('✅ Datos guardados');
+            } catch (e) {
+                console.error("Error al guardar datos:", e);
+                updateDataStatus('❌ Error al guardar', true);
+            }
+        }
+        
+        function sanitizeData(data) {
+            let sanitized = false;
+            data.forEach(client => {
+                if (!client.id) { client.id = generateId(client); sanitized = true; }
+                if (!client.observaciones) { client.observaciones = []; sanitized = true; }
+                
+                client.observaciones.forEach(obs => {
+                    if (!obs.id) { obs.id = generateId({}); sanitized = true; }
+                    if (typeof obs.completed === 'undefined') {
+                        obs.completed = isPastDue(obs.proximaRevision);
+                        sanitized = true;
+                    }
+                });
+
+                const audienceObs = (client.observaciones || []).filter(obs => obs.texto.startsWith('AUDIENCIA:')).sort((a, b) => new Date(a.proximaRevision) - new Date(b.proximaRevision));
+                const newAudienceHistory = audienceObs.map(obs => `${formatDate(obs.proximaRevision)}: ${obs.texto.substring('AUDIENCIA: '.length)}`).join('\n');
+                if (client.audiencias !== newAudienceHistory) {
+                    client.audiencias = newAudienceHistory;
+                    sanitized = true;
+                }
+            });
+            if (sanitized) updateDataStatus('🔧 Datos sincronizados y actualizados.');
+            return data;
+        }
+
+        function loadData() {
+            try {
+                const savedData = localStorage.getItem('planilla_juridica_data');
+                let data = savedData ? JSON.parse(savedData) : JSON.parse(JSON.stringify(initialData));
+                clientsData = sanitizeData(data);
+                if (!savedData) {
+                    if (clientsData.length > 0) saveData();
+                    else updateDataStatus('📋 Planilla lista para agregar clientes.');
+                } else {
+                    updateDataStatus('✅ Datos cargados');
+                }
+            } catch (e) {
+                console.error("Error cargando datos:", e);
+                const backup = localStorage.getItem('planilla_juridica_data_backup');
+                clientsData = backup ? JSON.parse(backup) : JSON.parse(JSON.stringify(initialData));
+                updateDataStatus('⚠️ Error al cargar, respaldo restaurado.', true);
+            }
+        }
+
+        function updateDataStatus(message, isError = false) {
+            const el = document.getElementById('dataStatus');
+            el.textContent = message;
+            el.style.background = isError ? '#f8d7da' : '#d4edda';
+            el.style.borderColor = isError ? '#f5c6cb' : '#c3e6cb';
+            el.style.color = isError ? '#721c24' : '#155724';
+            setTimeout(() => {
+                el.textContent = '💾 Los datos se guardan automáticamente en tu navegador';
+                el.style.background = '#d4edda';
+                el.style.borderColor = '#c3e6cb';
+                el.style.color = '#155724';
+            }, 4000);
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'No definida';
+            return new Date(dateString + 'T00:00:00').toLocaleDateString('es-AR', { timeZone: 'UTC' });
+        }
+
+        function isToday(dateString) {
+            if (!dateString) return false;
+            return new Date().toDateString() === new Date(dateString + 'T00:00:00').toDateString();
+        }
+
+        function isPastDue(dateString) {
+            if (!dateString) return false;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return new Date(dateString + 'T00:00:00') < today;
+        }
+        
+        function getDaysDifference(dateString) {
+            if (!dateString) return 999;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const diffTime = new Date(dateString + 'T00:00:00') - today;
+            return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+
+        function generateId(item) {
+            const name = item.nombre || 'OBS';
+            return `${name.replace(/\s+/g, '_').toUpperCase()}_${Date.now()}_${Math.random()}`;
+        }
+
+        function getDisplayName(client) {
+            return `${client.nombre} - Exp: ${client.expediente || 'S/E'}`;
+        }
+
+        function updateClientNextRevision(client) {
+            if (!client.observaciones || client.observaciones.length === 0) {
+                client.proximaRevision = '';
+                client.observacion = '';
+                return;
+            }
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const futureObservations = client.observaciones
+                .filter(obs => !obs.completed && obs.proximaRevision && new Date(obs.proximaRevision + 'T00:00:00') >= today)
+                .sort((a, b) => new Date(a.proximaRevision) - new Date(b.proximaRevision));
+            
+            if (futureObservations.length > 0) {
+                const nextObs = futureObservations[0];
+                client.proximaRevision = nextObs.proximaRevision;
+                client.observacion = nextObs.texto;
+            } else {
+                client.proximaRevision = '';
+                client.observacion = 'No hay tareas pendientes';
+            }
+        }
+        
+        function toggleCompleted(event, clientId, obsId) {
+            event.stopPropagation();
+            const client = clientsData.find(c => c.id === clientId);
+            if (!client) return;
+            const obs = client.observaciones.find(o => o.id === obsId);
+            if (!obs) return;
+            obs.completed = !obs.completed;
+            updateClientNextRevision(client);
+            saveData();
+            renderAll();
+        }
+
+        function renderAll() {
+            clientsData.forEach(updateClientNextRevision);
+            renderDashboardLists();
+            filterReviews();
+        }
+
+        function renderDashboardLists() {
+            const allTasks = clientsData.flatMap(client => 
+                (client.observaciones || []).map(obs => ({...obs, client}))
+            );
+
+            const todayTasks = allTasks.filter(task => !task.completed && isToday(task.proximaRevision));
+            const overdueTasks = allTasks.filter(task => !task.completed && isPastDue(task.proximaRevision)).sort((a,b) => new Date(a.proximaRevision) - new Date(b.proximaRevision));
+            const upcomingTasks = allTasks.filter(task => !task.completed && getDaysDifference(task.proximaRevision) > 0 && getDaysDifference(task.proximaRevision) <= 30).sort((a,b) => new Date(a.proximaRevision) - new Date(b.proximaRevision));
+
+            renderList('todayReviews', todayTasks, 'No hay revisiones para hoy', 'today');
+            renderList('overdueReviews', overdueTasks, 'No hay revisiones vencidas', 'overdue');
+            renderList('upcomingReviews', upcomingTasks, 'No hay próximas revisiones', 'upcoming');
+        }
+
+        function renderList(containerId, tasks, emptyMsg, type) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = tasks.length === 0
+                ? `<p style="color: rgba(255,255,255,0.8); font-style: italic;">${emptyMsg}</p>`
+                : tasks.map(task => {
+                    let dateInfo = '';
+                    if (type === 'today') dateInfo = 'HOY';
+                    else if (type === 'overdue') dateInfo = `VENCIDA - ${formatDate(task.proximaRevision)}`;
+                    else dateInfo = `En ${getDaysDifference(task.proximaRevision)} días - ${formatDate(task.proximaRevision)}`;
+                    
+                    return `
+                    <div class="review-item">
+                        <button class="complete-btn" onclick="toggleCompleted(event, '${task.client.id}', '${task.id}')">✔️</button>
+                        <div class="review-item-content" onclick="showClientModal('${task.client.id}')">
+                            <div class="review-date">${dateInfo}</div>
+                            <div class="review-client">${task.client.nombre} - Carátula: ${task.client.caratula || 'S/C'}</div>
+                            <div class="review-expediente">Exp: ${task.client.expediente || 'S/E'}</div>
+                            <div class="review-obs">${task.texto}</div>
+                        </div>
+                    </div>`;
+                }).join('');
+        }
+        
+        function filterReviews() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const allObservations = clientsData.flatMap(client => 
+                (client.observaciones || []).map(obs => ({...obs, client}))
+            ).sort((a, b) => new Date(b.proximaRevision) - new Date(a.proximaRevision));
+
+            const filteredTasks = allObservations.filter(task => 
+                Object.values(task.client).some(val => String(val).toLowerCase().includes(searchTerm)) ||
+                task.texto.toLowerCase().includes(searchTerm)
+            );
+
+            document.getElementById('allReviews').innerHTML = filteredTasks.length === 0
+                ? '<p style="text-align:center; padding: 20px;">No se encontraron revisiones.</p>'
+                : filteredTasks.map(task => {
+                    const classes = `review-item ${task.completed ? 'completed' : ''} ${!task.completed && isToday(task.proximaRevision) ? 'today' : ''} ${!task.completed && isPastDue(task.proximaRevision) ? 'overdue' : ''}`;
+                    return `
+                    <div class="${classes}">
+                         <button class="complete-btn" onclick="toggleCompleted(event, '${task.client.id}', '${task.id}')">✔️</button>
+                        <div class="review-item-content" onclick="showClientModal('${task.client.id}')">
+                            <div class="review-date">Revisión para el: ${formatDate(task.proximaRevision)}</div>
+                            <div class="review-client">${task.client.nombre} - Carátula: ${task.client.caratula || 'S/C'}</div>
+                            <div class="review-obs">${task.texto}</div>
+                        </div>
+                    </div>`;
+                }).join('');
+        }
+
+        function editObservation(clientId, obsId) {
+            const client = clientsData.find(c => c.id === clientId);
+            if (!client) return;
+            const obsToEdit = client.observaciones.find(o => o.id === obsId);
+            if (!obsToEdit) return;
+            
+            editingObservation = { clientId, obsId };
+            
+            const obsElement = document.getElementById(`obs-${obsId}`);
+            if (!obsElement) {
+                console.error("Could not find observation element to edit:", obsId);
+                showClientModal(clientId);
+                return;
+            }
+
+            obsElement.innerHTML = `
+                <div class="form-group"><label>Fecha Observación</label><input type="date" id="edit-obs-fecha" value="${obsToEdit.fecha}"></div>
+                <div class="form-group"><label>Observación</label><textarea id="edit-obs-texto" rows="3">${obsToEdit.texto}</textarea></div>
+                <div class="form-group"><label>Próxima Revisión</label><input type="date" id="edit-obs-revision" value="${obsToEdit.proximaRevision || ''}"></div>
+                <div class="obs-actions">
+                    <button class="btn btn-success btn-sm" onclick="saveObservation()">💾 Guardar</button>
+                    <button class="btn btn-danger btn-sm" onclick="cancelEditObservation('${clientId}')">❌ Cancelar</button>
+                    <button type="button" class="btn btn-warning btn-sm" onclick="deleteObservation('${clientId}', '${obsId}')">🗑️ Eliminar</button>
+                </div>`;
+        }
+        
+        function saveObservation() {
+            if (!editingObservation) return;
+            const { clientId, obsId } = editingObservation;
+            const client = clientsData.find(c => c.id === clientId);
+            if (!client) return;
+            const obsIndex = client.observaciones.findIndex(o => o.id === obsId);
+            if (obsIndex === -1) return;
+
+            const newFecha = document.getElementById('edit-obs-fecha').value;
+            const newTexto = document.getElementById('edit-obs-texto').value;
+            const newRevisionDate = document.getElementById('edit-obs-revision').value;
+            if (!newFecha || !newTexto.trim() || !newRevisionDate) return alert('⚠️ Todos los campos son obligatorios.');
+            
+            client.observaciones[obsIndex].fecha = newFecha;
+            client.observaciones[obsIndex].texto = newTexto;
+            client.observaciones[obsIndex].proximaRevision = newRevisionDate;
+            
+            updateClientNextRevision(client);
+            editingObservation = null;
+            saveData();
+            showClientModal(clientId);
+            renderAll();
+        }
+
+        function cancelEditObservation(clientId) {
+            editingObservation = null;
+            showClientModal(clientId);
+        }
+
+        function deleteObservation(clientId, obsId) {
+            const client = clientsData.find(c => c.id === clientId);
+            if (!client) return;
+            const obsIndex = client.observaciones.findIndex(o => o.id === obsId);
+            if (obsIndex === -1) return;
+
+            if (confirm('¿Estás seguro de que deseas eliminar esta observación?')) {
+                client.observaciones.splice(obsIndex, 1);
+                const audienceObs = (client.observaciones || []).filter(obs => obs.texto.startsWith('AUDIENCIA:')).sort((a, b) => new Date(a.proximaRevision) - new Date(b.proximaRevision));
+                client.audiencias = audienceObs.map(obs => `${formatDate(obs.proximaRevision)}: ${obs.texto.substring('AUDIENCIA: '.length)}`).join('\n');
+                updateClientNextRevision(client);
+                saveData();
+                showClientModal(clientId);
+                renderAll();
+            }
+        }
+
+        function editField(clientId, fieldName, currentValue, inputType = 'text', isTextArea = false) {
+            if (fieldName === 'proximaRevision') return alert("La 'Próxima Revisión' se gestiona desde las observaciones.");
+            editingClientId = clientId;
+            editingField = fieldName;
+            const fieldElement = document.getElementById(`field-${fieldName}`);
+            let inputElement;
+            if (isTextArea) {
+                inputElement = document.createElement('textarea');
+                inputElement.rows = 5;
+            } else {
+                inputElement = document.createElement('input');
+                inputElement.type = inputType;
+            }
+            inputElement.value = currentValue || '';
+            fieldElement.innerHTML = '';
+            fieldElement.appendChild(inputElement);
+            inputElement.focus();
+            inputElement.addEventListener('blur', saveField);
+            inputElement.addEventListener('keypress', e => { if (e.key === 'Enter' && !isTextArea) saveField(); });
+        }
+
+        function saveField() {
+            if (!editingClientId || !editingField) return;
+            const client = clientsData.find(c => c.id === editingClientId);
+            const fieldElement = document.getElementById(`field-${editingField}`);
+            const inputElement = fieldElement.querySelector('input, textarea');
+            if (client && inputElement) {
+                client[editingField] = inputElement.value;
+                fieldElement.innerHTML = `<div class="info-value">${inputElement.value || 'No especificado'}</div>`;
+                saveData();
+                renderAll();
+            }
+            editingClientId = null;
+            editingField = null;
+        }
+
+        function deleteClient(clientId) {
+            if (confirm('¿Estás seguro de que deseas eliminar este expediente?')) {
+                createBackup();
+                clientsData = clientsData.filter(c => c.id !== clientId);
+                saveData();
+                renderAll();
+                closeModal('clientInfoModal');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('newClientModal').querySelector('.modal-content').innerHTML = `
+                <span class="close" onclick="closeModal('newClientModal')">&times;</span><h2>➕ Agregar Nuevo Cliente</h2>
+                <form id="newClientForm">
+                    <div class="info-grid"><div class="form-group"><label>Nombre y Apellido *</label><input type="text" id="newNombre" required></div><div class="form-group"><label>DNI *</label><input type="number" id="newDni" required></div><div class="form-group"><label>Teléfono</label><input type="tel" id="newTelefono"></div><div class="form-group"><label>Estado</label><input type="text" id="newEstado"></div></div>
+                    <div class="form-group"><label>Carátula</label><input type="text" id="newCaratula"></div><div class="form-group"><label>Expediente</label><input type="text" id="newExpediente"></div><div class="form-group"><label>Juzgado</label><input type="text" id="newJuzgado"></div>
+                    <div class="form-group"><label>Observación Inicial</label><textarea id="newObservacion" rows="3"></textarea></div><div class="form-group"><label>Fecha de Revisión *</label><input type="date" id="newProximaRevision" required></div>
+                    <div style="text-align: center; margin-top: 30px;"><button type="submit" class="btn btn-success">💾 Guardar Cliente</button></div>
+                </form>`;
+            
+            document.getElementById('clientSelectorModal').querySelector('.modal-content').innerHTML = `
+                 <span class="close" onclick="closeModal('clientSelectorModal')">&times;</span><h2>👥 Seleccionar Cliente/Expediente</h2>
+                 <div class="form-group"><label>Cliente/Expediente</label><select id="clientSelector" onchange="loadClientInfo()"></select></div>`;
+
+            document.getElementById('newClientForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const newClient = {
+                    id: generateId({ nombre: document.getElementById('newNombre').value }),
+                    nombre: document.getElementById('newNombre').value.toUpperCase(),
+                    dni: document.getElementById('newDni').value,
+                    telefono: document.getElementById('newTelefono').value,
+                    caratula: document.getElementById('newCaratula').value.toUpperCase(),
+                    expediente: document.getElementById('newExpediente').value,
+                    juzgado: document.getElementById('newJuzgado').value.toUpperCase(),
+                    estado: document.getElementById('newEstado').value.toUpperCase(),
+                    audiencias: '',
+                    observaciones: []
+                };
+                const initialObsText = document.getElementById('newObservacion').value;
+                const initialRevisionDate = document.getElementById('newProximaRevision').value;
+                if (initialObsText && initialRevisionDate) {
+                    newClient.observaciones.push({ id: generateId({}), fecha: new Date().toISOString().split('T')[0], texto: initialObsText, proximaRevision: initialRevisionDate, completed: false });
+                }
+                updateClientNextRevision(newClient);
+                clientsData.push(newClient);
+                saveData();
+                renderAll();
+                closeModal('newClientModal');
+                e.target.reset();
+            });
+
+            loadData();
+            renderAll();
+            createBackup();
+        });
+
+        function showClientModal(clientId) {
+            const client = clientsData.find(c => c.id === clientId);
+            if (!client) return;
+            updateClientNextRevision(client);
+            const content = `
+                <span class="close" onclick="closeModal('clientInfoModal')">&times;</span>
+                <h2>👤 ${client.nombre}</h2>
+                <div class="client-info">
+                    <h4>📋 Información del Expediente</h4>
+                    <div class="info-grid">
+                        <div class="info-item"><div class="info-label">DNI</div><div class="editable-field" id="field-dni" onclick="editField('${client.id}', 'dni', '${client.dni || ''}', 'number')"><div class="info-value">${client.dni || 'S/D'}</div></div></div>
+                        <div class="info-item"><div class="info-label">Teléfono</div><div class="editable-field" id="field-telefono" onclick="editField('${client.id}', 'telefono', '${client.telefono || ''}')"><div class="info-value">${client.telefono || 'S/T'}</div></div></div>
+                        <div class="info-item"><div class="info-label">Estado</div><div class="editable-field" id="field-estado" onclick="editField('${client.id}', 'estado', '${client.estado || ''}')"><div class="info-value">${client.estado || 'S/E'}</div></div></div>
+                        <div class="info-item"><div class="info-label">Próxima Tarea</div><div class="info-value" style="color: #e74c3c; font-weight: bold;">${formatDate(client.proximaRevision)}</div></div>
+                    </div>
+                    <div class="info-grid full-width" style="margin-top: 15px;">
+                        <div class="info-item"><div class="info-label">Carátula</div><div class="editable-field" id="field-caratula" onclick="editField('${client.id}', 'caratula', '${(client.caratula || '').replace(/'/g, '&#39;')}')"><div class="info-value">${client.caratula || 'No especificada'}</div></div></div>
+                        <div class="info-item"><div class="info-label">Expediente</div><div class="editable-field" id="field-expediente" onclick="editField('${client.id}', 'expediente', '${(client.expediente || '').replace(/'/g, '&#39;')}')"><div class="info-value">${client.expediente || 'No especificado'}</div></div></div>
+                        <div class="info-item"><div class="info-label">Juzgado</div><div class="editable-field" id="field-juzgado" onclick="editField('${client.id}', 'juzgado', '${(client.juzgado || '').replace(/'/g, '&#39;')}')"><div class="info-value">${client.juzgado || 'No especificado'}</div></div></div>
+                        <div class="info-item"><div class="info-label">Audiencias (Automático)</div><div id="field-audiencias"><div class="info-value-large">${client.audiencias || 'No hay audiencias registradas'}</div></div></div>
+                    </div>
+                </div>
+                <div class="observations-history">
+                    <h4>📝 Historial de Tareas</h4>
+                    <div style="max-height: 200px; overflow-y: auto; margin-bottom: 15px;">
+                        ${(client.observaciones && client.observaciones.length > 0) ? 
+                            [...client.observaciones].sort((a, b) => new Date(b.proximaRevision) - new Date(a.proximaRevision)).map((obs) => {
+                                const isTask = obs.proximaRevision === client.proximaRevision && obs.texto === client.observacion && !obs.completed;
+                                const itemClasses = `obs-item ${obs.completed ? 'completed' : ''}`;
+                                const itemStyles = isTask ? 'border-left: 4px solid #e74c3c; background: #fff5f5;' : (obs.completed ? 'border-left: 4px solid #2ecc71; background: #f2fdf5;' : '');
+                                return `
+                                <div class="${itemClasses}" id="obs-${obs.id}" style="${itemStyles}">
+                                    <button class="obs-edit-btn" onclick="editObservation('${client.id}', '${obs.id}')">✏️</button>
+                                    <div class="obs-date">${formatDate(obs.fecha)}${isTask ? ' <span style="color: #c0392b; font-weight: bold;">(PRÓXIMA TAREA)</span>' : (obs.completed ? ' <span style="color: #27ae60; font-weight: bold;">(TRABAJADA)</span>' : '')}</div>
+                                    <div class="obs-text">${obs.texto}</div>
+                                    <div class="obs-revision-date">Fecha de Revisión: ${formatDate(obs.proximaRevision)}</div>
+                                </div>`;
+                            }).join('') : '<p>No hay observaciones.</p>'}
+                    </div>
+                </div>
+                <form class="form-section" onsubmit="addObservation(event, '${client.id}')"><h4>➕ Agregar Tarea/Observación</h4><div class="form-group"><label>Texto</label><textarea id="newObsText" rows="2" required></textarea></div><div class="form-group"><label>Fecha de Revisión</label><input type="date" id="newRevisionDate" required></div><button type="submit" class="btn btn-success">💾 Guardar Tarea</button></form>
+                <form class="form-section" onsubmit="addAudience(event, '${client.id}')"><h4>📅 Agendar Audiencia</h4><div class="form-group"><label>Fecha Audiencia</label><input type="date" id="newAudienceDate" required></div><div class="form-group"><label>Descripción</label><input type="text" id="newAudienceObs" required></div><button type="submit" class="btn btn-success">🔔 Agendar</button></form>
+                <div class="action-buttons" style="margin-top: 30px;">
+                    <button class="btn btn-info" onclick="showDocumentModal('${client.id}')">📁 Gestionar Documentos</button>
+                    <button class="btn btn-danger" onclick="deleteClient('${client.id}')">🗑️ Eliminar Expediente</button>
+                    <button class="btn" onclick="closeModal('clientInfoModal')">✖️ Cerrar</button>
+                </div>`;
+            document.getElementById('clientInfoModal').querySelector('.modal-content').innerHTML = content;
+            document.getElementById('clientInfoModal').classList.add('active');
+        }
+
+        function loadClientInfo() {
+            const clientId = document.getElementById('clientSelector').value;
+            if (clientId) { closeModal('clientSelectorModal'); showClientModal(clientId); }
+        }
+
+        function showNewClientModal() { document.getElementById('newClientModal').classList.add('active'); }
+        function showClientSelectorModal() {
+            const selector = document.getElementById('clientSelector');
+            selector.innerHTML = '<option value="">-- Seleccionar --</option>' + [...clientsData].sort((a,b) => a.nombre.localeCompare(b.nombre)).map(c => `<option value="${c.id}">${getDisplayName(c)}</option>`).join('');
+            document.getElementById('clientSelectorModal').classList.add('active');
+        }
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('active');
+            }
+            editingClientId = null; editingField = null; editingObservation = null;
+        }
+
+        function addObservation(event, clientId) {
+            event.preventDefault();
+            const client = clientsData.find(c => c.id === clientId);
+            if (!client) return;
+            client.observaciones.push({ id: generateId({}), fecha: new Date().toISOString().split('T')[0], texto: document.getElementById('newObsText').value, proximaRevision: document.getElementById('newRevisionDate').value, completed: false });
+            updateClientNextRevision(client);
+            saveData();
+            showClientModal(clientId);
+            renderAll();
+        }
+
+        function addAudience(event, clientId) {
+            event.preventDefault();
+            const client = clientsData.find(c => c.id === clientId);
+            if (!client) return;
+            const audienceDate = document.getElementById('newAudienceDate').value;
+            const audienceObs = document.getElementById('newAudienceObs').value;
+            client.observaciones.push({ id: generateId({}), fecha: new Date().toISOString().split('T')[0], texto: `AUDIENCIA: ${audienceObs}`, proximaRevision: audienceDate, completed: false });
+            const audienceEntry = `${formatDate(audienceDate)}: ${audienceObs}`;
+            client.audiencias = client.audiencias ? `${client.audiencias}\n${audienceEntry}` : audienceEntry;
+            updateClientNextRevision(client);
+            saveData();
+            showClientModal(clientId);
+            renderAll();
+        }
+
+        function exportToExcel() {
+            try {
+                const excelData = clientsData.map(client => {
+                    const allObservations = (client.observaciones || []).map(obs => `${obs.completed ? '[TRABAJADA] ' : ''}${formatDate(obs.fecha)} (Rev: ${formatDate(obs.proximaRevision)}): ${obs.texto}`).join(' | ');
+                    return { 'Nombre': client.nombre, 'DNI': client.dni, 'Teléfono': client.telefono, 'Estado': client.estado, 'Carátula': client.caratula, 'Expediente': client.expediente, 'Juzgado': client.juzgado, 'Próxima Tarea Pendiente': formatDate(client.proximaRevision), 'Observación Activa': client.observacion, 'Historial Completo': allObservations };
+                });
+                const worksheet = XLSX.utils.json_to_sheet(excelData);
+                const workbook = XLSX.utils.book_new();
+                worksheet['!cols'] = [{wch:25},{wch:12},{wch:15},{wch:15},{wch:40},{wch:20},{wch:25},{wch:15},{wch:30},{wch:50}];
+                XLSX.utils.book_append_sheet(workbook, worksheet, 'Planilla Jurídica');
+                XLSX.writeFile(workbook, `Planilla_Juridica_${new Date().toISOString().split('T')[0]}.xlsx`);
+            } catch (error) { console.error('Error exportando a Excel:', error); }
+        }
+
+        function exportData() {
+            const dataStr = JSON.stringify(clientsData, null, 2);
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(new Blob([dataStr], {type: 'application/json'}));
+            link.download = `planilla_juridica_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+        }
+
+        function importData() { document.getElementById('importInput').click(); }
+
+        function handleImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = e => {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (!Array.isArray(importedData)) throw new Error('Formato no válido');
+                    if (confirm(`Se importarán ${importedData.length} registros. ¿Reemplazar datos actuales?`)) {
+                        createBackup();
+                        clientsData = importedData;
+                        saveData();
+                        renderAll();
+                    }
+                } catch (err) { alert('❌ Error al importar. Verifique el archivo JSON.'); }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        window.addEventListener('click', e => { if (e.target.classList.contains('modal')) closeModal(e.target.id); });
+        setInterval(renderAll, 60000);
+
+    </script>
+
+    <!-- ======================================================= -->
+    <!-- === SECCIÓN DE CÓDIGO DE GOOGLE DRIVE (NO TOCAR) === -->
+    <!-- ======================================================= -->
+    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+    <script>
+        // <!-- ⚠️ NO TOCAR ⚠️ -->
+        const CLIENT_ID = '976943805178-lr5pvivhpstfnjp4leoolopo0kvb1cif.apps.googleusercontent.com';
+        const API_KEY = 'AIzaSyDSMWMM3lJM4ZNqRezhH-8uxaE1GVOjrrM';
+        
+        const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+        const DATA_FILE_NAME = 'datos_planilla_juridica.json';
+        const DOCS_FOLDER_NAME = 'Planilla_Juridica_Documentos';
+
+        let tokenClient;
+        let gapiInited = false;
+        let gisInited = false;
+        let dataFileId = null;
+        let docsFolderId = null;
+        let currentClientIdForDocs = null;
+
+        const driveStatusEl = document.getElementById('driveStatus');
+        const connectDriveBtn = document.getElementById('connectDriveBtn');
+        const saveToDriveBtn = document.getElementById('saveToDriveBtn');
+        const loadFromDriveBtn = document.getElementById('loadFromDriveBtn');
+
+        function gapiLoaded() { gapi.load('client', initializeGapiClient); }
+        async function initializeGapiClient() {
+            await gapi.client.init({ apiKey: API_KEY, discoveryDocs: [DISCOVERY_DOC] });
+            gapiInited = true;
+            maybeEnableButtons();
+        }
+        function gisLoaded() {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: '', 
+            });
+            gisInited = true;
+            maybeEnableButtons();
+        }
+        function maybeEnableButtons() {
+            if (gapiInited && gisInited) {
+                connectDriveBtn.onclick = handleAuthClick;
+            }
+        }
+        function updateDriveStatus(message, isConnected = false) {
+            driveStatusEl.style.display = 'block';
+            driveStatusEl.textContent = message;
+            driveStatusEl.style.background = isConnected ? '#d1e7dd' : '#fff3cd';
+            driveStatusEl.style.color = isConnected ? '#0f5132' : '#664d03';
+        }
+
+        function handleAuthClick() {
+            tokenClient.callback = async (resp) => {
+                if (resp.error) throw (resp);
+                updateDriveStatus('✅ Conectado a Google Drive', true);
+                connectDriveBtn.style.display = 'none';
+                saveToDriveBtn.style.display = 'inline-block';
+                loadFromDriveBtn.style.display = 'inline-block';
+                saveToDriveBtn.onclick = saveDataToDrive;
+                loadFromDriveBtn.onclick = loadDataFromDrive;
+                await findDataFile();
+            };
+            if (gapi.client.getToken() === null) {
+                tokenClient.requestAccessToken({prompt: 'consent'});
+            } else {
+                tokenClient.requestAccessToken({prompt: ''});
+            }
+        }
+
+        async function findDataFile() {
+            updateDriveStatus('Buscando archivo de datos en Drive...', false);
+            try {
+                const response = await gapi.client.drive.files.list({
+                    q: `name='${DATA_FILE_NAME}' and trashed=false`,
+                    fields: 'files(id, name)',
+                    spaces: 'drive'
+                });
+                if (response.result.files.length > 0) {
+                    dataFileId = response.result.files[0].id;
+                    updateDriveStatus(`✅ Archivo de datos encontrado. Listo para operar.`, true);
+                } else {
+                    updateDriveStatus(`⚠️ Archivo de datos no encontrado. Se creará al guardar.`, false);
+                    dataFileId = null;
+                }
+            } catch (err) {
+                console.error("Error buscando archivo de datos:", err);
+                alert('Error al buscar el archivo de datos en Google Drive.');
+                updateDriveStatus(`❌ Error al conectar con Drive.`, false);
+            }
+        }
+        
+        async function saveDataToDrive() {
+            if (!confirm('¿Quieres guardar los datos actuales en Google Drive?')) return;
+            const content = JSON.stringify(clientsData, null, 2);
+            updateDriveStatus('Guardando datos en Drive...', false);
+            try {
+                // Reutilizamos la función de subida genérica
+                const fileMetadata = await uploadFileContent(content, DATA_FILE_NAME, 'application/json', null, dataFileId);
+                dataFileId = fileMetadata.id;
+                updateDriveStatus('✅ ¡Datos guardados en Google Drive con éxito!', true);
+                alert('¡Datos guardados en Google Drive con éxito!');
+            } catch (err) {
+                console.error("Error guardando datos en Drive:", err);
+                updateDriveStatus('❌ Error al guardar datos en Drive.', false);
+                alert('Error al guardar los datos en Google Drive.');
+            }
+        }
+
+        async function loadDataFromDrive() {
+            if (!dataFileId) return alert("No se ha encontrado un archivo de datos en tu Drive. Guarda primero para crear uno.");
+            if (!confirm("¿Seguro? Se reemplazarán los datos actuales con los de Drive. Se creará un respaldo local.")) return;
+            
+            updateDriveStatus('Cargando datos desde Drive...', false);
+            try {
+                const response = await gapi.client.drive.files.get({ fileId: dataFileId, alt: 'media' });
+                const importedData = JSON.parse(response.body);
+                if (!Array.isArray(importedData)) throw new Error('Formato de datos no válido en Drive.');
+                
+                createBackup();
+                clientsData = importedData;
+                saveData();
+                renderAll();
+                
+                updateDriveStatus('✅ Datos cargados desde Drive con éxito.', true);
+                alert('Datos cargados desde Google Drive con éxito.');
+            } catch (err) {
+                console.error("Error cargando datos desde Drive:", err);
+                updateDriveStatus('❌ Error al cargar datos desde Drive.', false);
+                alert('Error al cargar datos desde Google Drive.');
+            }
+        }
+
+        // --- GESTIÓN DE DOCUMENTOS ---
+
+        async function getOrCreateFolder(name, parentId = null) {
+            let query = `mimeType='application/vnd.google-apps.folder' and name='${name}' and trashed=false`;
+            if (parentId) {
+                query += ` and '${parentId}' in parents`;
+            }
+
+            const response = await gapi.client.drive.files.list({ q: query, fields: 'files(id)' });
+            if (response.result.files.length > 0) {
+                return response.result.files[0].id;
+            } else {
+                const fileMetadata = { name, mimeType: 'application/vnd.google-apps.folder' };
+                if (parentId) {
+                    fileMetadata.parents = [parentId];
+                }
+                const newFolder = await gapi.client.drive.files.create({ resource: fileMetadata, fields: 'id' });
+                return newFolder.result.id;
+            }
+        }
+
+        async function showDocumentModal(clientId) {
+            if (gapi.client.getToken() === null) return alert('Por favor, conecta con Google Drive primero.');
+            
+            currentClientIdForDocs = clientId;
+            const client = clientsData.find(c => c.id === clientId);
+            if (!client) return;
+
+            document.getElementById('documentModalTitle').innerText = `Documentos de: ${client.nombre}`;
+            document.getElementById('documentModal').classList.add('active');
+            const listEl = document.getElementById('documentList');
+            listEl.innerHTML = '<div class="spinner"></div>';
+
+            try {
+                if (!docsFolderId) docsFolderId = await getOrCreateFolder(DOCS_FOLDER_NAME);
+                
+                const clientFolderName = `${client.nombre.replace(/[\/\\?%*:|"<>]/g, '-')}_${client.dni}`;
+                const clientFolderId = await getOrCreateFolder(clientFolderName, docsFolderId);
+                
+                const response = await gapi.client.drive.files.list({
+                    q: `'${clientFolderId}' in parents and trashed=false`,
+                    fields: 'files(id, name, webViewLink)'
+                });
+
+                if (response.result.files.length === 0) {
+                    listEl.innerHTML = '<li>No hay documentos para este cliente.</li>';
+                } else {
+                    listEl.innerHTML = response.result.files.map(file => `
+                        <li>
+                            <a href="${file.webViewLink}" target="_blank" rel="noopener noreferrer">${file.name}</a>
+                            <button class="btn btn-danger btn-sm" onclick="deleteDocument('${file.id}')">Eliminar</button>
+                        </li>
+                    `).join('');
+                }
+            } catch (err) {
+                console.error("Error gestionando documentos:", err);
+                listEl.innerHTML = '<li>Error al cargar documentos. Revisa la consola.</li>';
+            }
+        }
+        
+        async function deleteDocument(fileId) {
+            if (!confirm('¿Estás seguro de que quieres eliminar este documento de forma permanente?')) return;
+
+            const listEl = document.getElementById('documentList');
+            listEl.innerHTML = '<div class="spinner"></div><p style="text-align:center;">Eliminando archivo...</p>';
+
+            try {
+                await gapi.client.drive.files.delete({ fileId: fileId });
+                alert('Documento eliminado con éxito.');
+                showDocumentModal(currentClientIdForDocs); // Recargar la lista
+            } catch (err) {
+                console.error("Error al eliminar documento:", err);
+                alert('Error al eliminar el documento. Revisa la consola.');
+                showDocumentModal(currentClientIdForDocs); // Recargar igualmente para mostrar el estado actual
+            }
+        }
+
+        function triggerDocumentUpload() {
+            const uploader = document.getElementById('documentUploadInput');
+            uploader.onchange = handleDocumentUpload;
+            uploader.value = ''; // Resetear por si se sube el mismo archivo dos veces
+            uploader.click();
+        }
+
+        async function handleDocumentUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const listEl = document.getElementById('documentList');
+            listEl.innerHTML = '<div class="spinner"></div><p style="text-align:center;">Subiendo archivo, por favor espera...</p>';
+
+            try {
+                if (!docsFolderId) docsFolderId = await getOrCreateFolder(DOCS_FOLDER_NAME);
+                const client = clientsData.find(c => c.id === currentClientIdForDocs);
+                const clientFolderName = `${client.nombre.replace(/[\/\\?%*:|"<>]/g, '-')}_${client.dni}`;
+                const clientFolderId = await getOrCreateFolder(clientFolderName, docsFolderId);
+                
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    await uploadFileContent(e.target.result, file.name, file.type, clientFolderId, null);
+                    alert(`¡Archivo "${file.name}" subido con éxito!`);
+                    showDocumentModal(currentClientIdForDocs);
+                };
+                reader.readAsArrayBuffer(file);
+
+            } catch (err) {
+                console.error("Error al subir documento:", err);
+                alert("Error al subir el archivo. Revisa la consola.");
+                showDocumentModal(currentClientIdForDocs);
+            }
+        }
+        
+        function uploadFileContent(content, fileName, mimeType, parentId, fileIdToUpdate) {
+            // Esta función es más robusta y maneja tanto ArrayBuffer como string
+            let contentToUpload, contentTypeForRequest;
+            if (typeof content === 'string') {
+                contentToUpload = content;
+                contentTypeForRequest = mimeType;
+            } else { // Asumimos ArrayBuffer
+                contentToUpload = new Uint8Array(content).reduce((data, byte) => data + String.fromCharCode(byte), '');
+                contentTypeForRequest = mimeType;
+            }
+
+            const boundary = '-------314159265358979323846';
+            const delimiter = `\r\n--${boundary}\r\n`;
+            const close_delim = `\r\n--${boundary}--`;
+
+            const metadata = { name: fileName, mimeType: mimeType };
+            if (parentId) metadata.parents = [parentId];
+            
+            const multipartRequestBody =
+                delimiter +
+                'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+                JSON.stringify(metadata) +
+                delimiter +
+                `Content-Type: ${contentTypeForRequest}\r\n` +
+                (typeof content === 'string' ? '' : 'Content-Transfer-Encoding: base64\r\n') +
+                '\r\n' +
+                (typeof content === 'string' ? contentToUpload : btoa(contentToUpload)) +
+                close_delim;
+
+            const path = fileIdToUpdate ? `/upload/drive/v3/files/${fileIdToUpdate}` : '/upload/drive/v3/files';
+            const method = fileIdToUpdate ? 'PATCH' : 'POST';
+
+            return gapi.client.request({
+                path: path,
+                method: method,
+                params: { uploadType: 'multipart' },
+                headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+                body: multipartRequestBody
+            }).then(response => response.result);
+        }
+
+    </script>
+</body>
+</html>
