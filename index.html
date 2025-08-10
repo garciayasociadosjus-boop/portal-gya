@@ -4,7 +4,171 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Planilla Jurídica - García & Asociados</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+    const CLIENT_ID = 'TU_CLIENT_ID_DE_GOOGLE'; // Mantén tu Client ID original aquí
+    const API_KEY = 'TU_API_KEY_DE_GOOGLE';     // Mantén tu API Key original aquí
+    const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
+    const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+    const FOLDER_ID = '15YqcN5SUx-Ba4vqy0ey9eubVQuh3XoVP'; // ID de la carpeta de Drive
+
+    const fileName = 'planilla_datos.json';
+    let fileId = null;
+    let accessToken = null;
+
+    function handleClientLoad() {
+        gapi.load('client:auth2', initClient);
+    }
+
+    function initClient() {
+        gapi.client.init({
+            apiKey: API_KEY,
+            clientId: CLIENT_ID,
+            discoveryDocs: DISCOVERY_DOCS,
+            scope: SCOPES
+        }).then(function () {
+            const authInstance = gapi.auth2.getAuthInstance();
+            if (authInstance.isSignedIn.get()) {
+                document.getElementById('authorize_button').style.display = 'none';
+                document.getElementById('signout_button').style.display = 'block';
+                accessToken = authInstance.currentUser.get().getAuthResponse().access_token;
+                loadData();
+            } else {
+                document.getElementById('authorize_button').style.display = 'block';
+                document.getElementById('signout_button').style.display = 'none';
+            }
+
+            authInstance.isSignedIn.listen(updateSigninStatus);
+        }, function(error) {
+            console.error('Error initializing client', error);
+        });
+    }
+
+    function updateSigninStatus(isSignedIn) {
+        if (isSignedIn) {
+            document.getElementById('authorize_button').style.display = 'none';
+            document.getElementById('signout_button').style.display = 'block';
+            accessToken = gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse().access_token;
+            loadData();
+        } else {
+            handleSignOutClick();
+        }
+    }
+
+    function handleAuthClick(event) {
+        gapi.auth2.getAuthInstance().signIn();
+    }
+
+    function handleSignOutClick(event) {
+        gapi.auth2.getAuthInstance().signOut();
+        document.getElementById('authorize_button').style.display = 'block';
+        document.getElementById('signout_button').style.display = 'none';
+        document.getElementById('dataForm').reset();
+        document.getElementById('status').textContent = 'Por favor, inicia sesión para cargar datos.';
+        fileId = null;
+        accessToken = null;
+    }
+
+    async function loadData() {
+        if (!accessToken) return;
+        try {
+            const response = await gapi.client.drive.files.list({
+                q: `name='${fileName}' and '${FOLDER_ID}' in parents and trashed=false`,
+                fields: 'files(id, name, webContentLink)',
+                spaces: 'drive'
+            });
+
+            if (response.result.files.length > 0) {
+                fileId = response.result.files[0].id;
+                const fileResponse = await gapi.client.drive.files.get({
+                    fileId: fileId,
+                    alt: 'media'
+                });
+                const data = JSON.parse(fileResponse.body);
+                for (const key in data) {
+                    if (document.getElementById(key)) {
+                        document.getElementById(key).value = data[key];
+                    }
+                }
+                document.getElementById('status').textContent = 'Datos cargados correctamente desde Drive.';
+            } else {
+                document.getElementById('status').textContent = 'Archivo de datos no encontrado en la carpeta. Se creará al guardar.';
+                fileId = null;
+            }
+        } catch (error) {
+            console.error("Error al cargar datos: ", error);
+            document.getElementById('status').textContent = 'Error al cargar datos. Revisa la consola.';
+        }
+    }
+
+    async function saveData() {
+        if (!gapi.auth2.getAuthInstance().isSignedIn.get()) {
+            alert('Por favor, inicia sesión primero.');
+            return;
+        }
+
+        const data = {
+            expediente: document.getElementById('expediente').value,
+            causa: document.getElementById('causa').value,
+            juzgado: document.getElementById('juzgado').value,
+            actor: document.getElementById('actor').value,
+            demandado: document.getElementById('demandado').value,
+            fecha_inicio: document.getElementById('fecha_inicio').value,
+            estado: document.getElementById('estado').value,
+            proximo_paso: document.getElementById('proximo_paso').value,
+            fecha_vencimiento: document.getElementById('fecha_vencimiento').value,
+            observaciones: document.getElementById('observaciones').value,
+        };
+
+        const fileContent = JSON.stringify(data, null, 2);
+        const blob = new Blob([fileContent], { type: 'application/json' });
+        
+        const metadata = {
+            name: fileName,
+            mimeType: 'application/json',
+        };
+
+        const form = new FormData();
+
+        try {
+            if (fileId) { // Si el archivo existe, lo actualizamos
+                metadata.name = fileName;
+                form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                form.append('file', blob);
+
+                await gapi.client.request({
+                    path: `/upload/drive/v3/files/${fileId}`,
+                    method: 'PATCH',
+                    params: { uploadType: 'multipart' },
+                    body: form
+                });
+                document.getElementById('status').textContent = 'Datos guardados y actualizados en Drive.';
+
+            } else { // Si no existe, lo creamos dentro de la carpeta
+                metadata.parents = [FOLDER_ID];
+                form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                form.append('file', blob);
+                
+                const response = await gapi.client.request({
+                    path: '/upload/drive/v3/files',
+                    method: 'POST',
+                    params: { uploadType: 'multipart' },
+                    body: form
+                });
+                fileId = response.result.id;
+                document.getElementById('status').textContent = 'Archivo creado y datos guardados en Drive.';
+            }
+        } catch (error) {
+            console.error("Error al guardar datos: ", error);
+            document.getElementById('status').textContent = 'Error al guardar. Revisa la consola.';
+        }
+    }
+
+    document.getElementById('dataForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveData();
+    });
+
+</script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -1098,3 +1262,4 @@
 </body>
 
 </html>
+
