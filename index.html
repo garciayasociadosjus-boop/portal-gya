@@ -807,7 +807,7 @@
     </script>
 
     <!-- ======================================================= -->
-    <!-- === SECCIÓN DE CÓDIGO DE GOOGLE DRIVE (NO TOCAR) === -->
+    <!-- === SECCIÓN DE CÓDIGO DE GOOGLE DRIVE (MODIFICADO) === -->
     <!-- ======================================================= -->
     <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
     <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
@@ -818,6 +818,11 @@
         
         const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
         const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+        // --- INICIO DE LA MODIFICACIÓN ---
+        const SHARED_FOLDER_ID = '15YqcN5SUx-Ba4vqy0ey9eubVQuh3XoVP'; // ID de tu carpeta compartida
+        // --- FIN DE LA MODIFICACIÓN ---
+
         const DATA_FILE_NAME = 'datos_planilla_juridica.json';
         const DOCS_FOLDER_NAME = 'Planilla_Juridica_Documentos';
 
@@ -879,18 +884,21 @@
         }
 
         async function findDataFile() {
-            updateDriveStatus('Buscando archivo de datos en Drive...', false);
+            updateDriveStatus('Buscando archivo de datos en la carpeta compartida...', false);
             try {
+                // --- MODIFICACIÓN ---
+                // Ahora busca el archivo DENTRO de la carpeta especificada.
+                const query = `name='${DATA_FILE_NAME}' and '${SHARED_FOLDER_ID}' in parents and trashed=false`;
                 const response = await gapi.client.drive.files.list({
-                    q: `name='${DATA_FILE_NAME}' and trashed=false`,
+                    q: query,
                     fields: 'files(id, name)',
                     spaces: 'drive'
                 });
                 if (response.result.files.length > 0) {
                     dataFileId = response.result.files[0].id;
-                    updateDriveStatus(`✅ Archivo de datos encontrado. Listo para operar.`, true);
+                    updateDriveStatus(`✅ Archivo de datos encontrado en la carpeta compartida.`, true);
                 } else {
-                    updateDriveStatus(`⚠️ Archivo de datos no encontrado. Se creará al guardar.`, false);
+                    updateDriveStatus(`⚠️ Archivo no encontrado en la carpeta. Se creará uno nuevo al guardar.`, false);
                     dataFileId = null;
                 }
             } catch (err) {
@@ -903,12 +911,15 @@
         async function saveDataToDrive() {
             if (!confirm('¿Quieres guardar los datos actuales en Google Drive?')) return;
             const content = JSON.stringify(clientsData, null, 2);
-            updateDriveStatus('Guardando datos en Drive...', false);
+            updateDriveStatus('Guardando datos en la carpeta compartida de Drive...', false);
             try {
-                // Reutilizamos la función de subida genérica
-                const fileMetadata = await uploadFileContent(content, DATA_FILE_NAME, 'application/json', null, dataFileId);
+                // --- MODIFICACIÓN ---
+                // Si el archivo no existe (dataFileId es null), lo crea dentro de la carpeta compartida.
+                // Si ya existe, simplemente actualiza su contenido.
+                const parentFolder = dataFileId ? null : SHARED_FOLDER_ID;
+                const fileMetadata = await uploadFileContent(content, DATA_FILE_NAME, 'application/json', parentFolder, dataFileId);
                 dataFileId = fileMetadata.id;
-                updateDriveStatus('✅ ¡Datos guardados en Google Drive con éxito!', true);
+                updateDriveStatus('✅ ¡Datos guardados en la carpeta compartida con éxito!', true);
                 alert('¡Datos guardados en Google Drive con éxito!');
             } catch (err) {
                 console.error("Error guardando datos en Drive:", err);
@@ -918,10 +929,10 @@
         }
 
         async function loadDataFromDrive() {
-            if (!dataFileId) return alert("No se ha encontrado un archivo de datos en tu Drive. Guarda primero para crear uno.");
+            if (!dataFileId) return alert("No se ha encontrado un archivo de datos en la carpeta compartida. Guarda primero para crear uno.");
             if (!confirm("¿Seguro? Se reemplazarán los datos actuales con los de Drive. Se creará un respaldo local.")) return;
             
-            updateDriveStatus('Cargando datos desde Drive...', false);
+            updateDriveStatus('Cargando datos desde la carpeta compartida de Drive...', false);
             try {
                 const response = await gapi.client.drive.files.get({ fileId: dataFileId, alt: 'media' });
                 const importedData = JSON.parse(response.body);
