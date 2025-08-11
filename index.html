@@ -174,7 +174,7 @@
             </section>
 
             <section class="filter-bar">
-                <div class="form-group"><label>Búsqueda General</label><input type="text" id="searchInput" placeholder="Buscar por actor, demandado, exp, etc." onkeyup="renderAllClientsList()"></div>
+                <div class="form-group"><label>Búsqueda General</label><input type="text" id="searchInput" placeholder="Buscar por nombre, carátula, exp, etc." onkeyup="renderAllClientsList()"></div>
                 <div class="form-group"><label>Filtrar por Estado</label><select id="estadoFilter" onchange="renderAllClientsList()"><option value="">Todos los estados</option><option value="EJECUCION">Ejecución</option><option value="FINALIZADA">Finalizada</option><option value="FINALIZADA PARCIAL">Finalizada Parcial</option><option value="DEMORADA">Demorada</option></select></div>
             </section>
 
@@ -200,7 +200,6 @@
             updateDataStatus('✅ Datos guardados localmente');
         }
 
-        // --- FUNCIÓN DE CARGA CON AUTO-REPARACIÓN DE DUPLICADOS ---
         function loadData() {
             const savedData = localStorage.getItem('planilla_juridica_data');
             let data = savedData ? JSON.parse(savedData) : [];
@@ -225,7 +224,7 @@
             clientsData = sanitizeData(deduplicatedData);
             
             if (needsSave) {
-                saveData(); // Guarda la lista limpia inmediatamente
+                saveData();
             }
             
             updateDataStatus(statusMessage, needsSave);
@@ -584,8 +583,8 @@
                 const importedData = JSON.parse(response.body);
                 if (!Array.isArray(importedData)) throw new Error('Formato no válido.');
                 clientsData = importedData;
-                saveData(); // Guardar localmente los datos importados de Drive
-                loadData(); // Recargar los datos para aplicar la limpieza de duplicados si es necesario
+                saveData();
+                loadData();
                 renderAll();
                 updateDriveStatus('✅ Datos cargados desde Drive con éxito.', true);
             } catch (err) { console.error(err); updateDriveStatus('❌ Error al cargar desde Drive.', false); alert('Error al cargar desde Drive: ' + err.message); }
