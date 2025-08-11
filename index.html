@@ -219,7 +219,7 @@
 
             const uniqueClients = new Map();
             data.forEach(client => {
-                const key = (client.expediente && String(client.expediente).trim() !== '' && String(client.expediente).trim() !== '0000') ? String(client.expediente).trim() : client.id;
+                const key = (client.caratula && String(client.caratula).trim() !== '') ? String(client.caratula).trim() : client.id;
                 if (!uniqueClients.has(key)) {
                     uniqueClients.set(key, client);
                 }
@@ -365,7 +365,7 @@
                 <div class="client-info">
                     <h4>📋 Información del Caso</h4>
                     <div class="info-grid">
-                        ${Object.entries({nombre: 'Nombre', dni: 'DNI', telefono: 'Teléfono', caratula: 'Carátula', expediente: 'N° Expediente', juzgado: 'Juzgado', direccionJuzgado: 'Dirección Juzgado', telJuzgado: 'Tel. Juzgado', estado: 'Estado', audiencias: 'Audiencias'}).map(([key, label]) => `
+                        ${Object.entries({nombre: 'Nombre', dni: 'DNI', telefono: 'Teléfono', caratula: 'Carátula', expediente: 'N° Expediente', juzgado: 'Juzgado', direccionJuzgado: 'Dirección Juzgado', telJuzgado: 'Tel. Juzgado', estado: 'Estado', audiencias: 'Audiencias (Campo Antiguo)'}).map(([key, label]) => `
                         <div class="info-item"><div class="info-label">${label}</div><div class="editable-field" id="field-${key}" onclick="editField('${client.id}', '${key}', '${String(client[key] || '').replace(/'/g, '&#39;')}')"><div class="info-value">${client[key] || 'S/D'}</div></div></div>`).join('')}
                         <div class="info-item"><div class="info-label">Próxima Tarea</div><div class="info-value" style="color: var(--danger-color); font-weight: bold;">${formatDate(client.proximaRevision)}</div></div>
                     </div>
@@ -399,7 +399,6 @@
                     return `<div class="history-item history-item-task ${item.completed ? 'completed' : ''}">
                         <div class="history-date">Revisar el: ${formatDate(item.proximaRevision)} <span class="history-tag tag-task">TAREA</span></div>
                         <div class="history-text">${item.texto}</div>
-                        <button class="btn btn-sm" onclick="editObs('${client.id}', '${item.id}')">Editar</button>
                         <button class="btn btn-danger btn-sm" onclick="deleteObs('${client.id}', '${item.id}')">Eliminar</button>
                     </div>`;
                 } else { // type === 'audience'
@@ -410,13 +409,6 @@
                     </div>`;
                 }
             }).join('');
-        }
-
-        function editObs(clientId, obsId) {
-            const obs = clientsData.find(c => c.id === clientId).observaciones.find(o => o.id === obsId);
-            const itemElement = document.querySelector(`#history-list-${clientId} .history-item-task`); // Improve selector later
-            // This part is tricky as the element is gone. Let's just reload the modal for simplicity.
-            alert("La edición directa en esta vista no está implementada. Por favor, elimine y vuelva a crear la tarea.");
         }
         
         function deleteObs(clientId, obsId) {
@@ -502,11 +494,11 @@
             document.getElementById('newClientForm').addEventListener('submit', function(e) {
                 e.preventDefault();
                 
-                const expedienteInput = document.getElementById('newExpediente');
-                const expedienteValue = expedienteInput.value.trim();
+                const caratulaInput = document.getElementById('newCaratula');
+                const caratulaValue = caratulaInput.value.trim();
 
-                if (expedienteValue && expedienteValue !== '0000' && clientsData.some(client => client.expediente && client.expediente.trim() === expedienteValue)) {
-                    alert(`Error: Ya existe un caso con el número de expediente "${expedienteValue}".\nPor favor, verifique los datos.`);
+                if (caratulaValue && clientsData.some(client => client.caratula && client.caratula.trim() === caratulaValue)) {
+                    alert(`Error: Ya existe un caso con la carátula "${caratulaValue}".\nPor favor, verifique los datos.`);
                     return;
                 }
 
@@ -515,8 +507,8 @@
                     nombre: document.getElementById('newNombre').value.toUpperCase(),
                     dni: document.getElementById('newDni').value,
                     telefono: document.getElementById('newTelefono').value,
-                    caratula: document.getElementById('newCaratula').value,
-                    expediente: expedienteValue,
+                    caratula: caratulaValue,
+                    expediente: document.getElementById('newExpediente').value.trim(),
                     juzgado: document.getElementById('newJuzgado').value,
                     direccionJuzgado: document.getElementById('newDireccionJuzgado').value,
                     telJuzgado: document.getElementById('newTelJuzgado').value,
@@ -660,13 +652,13 @@
             const boundary = '-------314159265358979323846';
             const metadata = { name: fileName, mimeType: mimeType, ...(parentId && { parents: [parentId] }) };
             const base64Data = content instanceof ArrayBuffer ? btoa(String.fromCharCode.apply(null, new Uint8Array(content))) : btoa(unescape(encodeURIComponent(content)));
-            const multipartRequestBody =
+            const requestBody =
                 `--${boundary}\r\n` +
-                'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+                `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
                 JSON.stringify(metadata) +
                 `\r\n--${boundary}\r\n` +
-                'Content-Type: ' + mimeType + '\r\n' +
-                'Content-Transfer-Encoding: base64\r\n\r\n' +
+                `Content-Type: ${mimeType}\r\n` +
+                `Content-Transfer-Encoding: base64\r\n\r\n` +
                 base64Data +
                 `\r\n--${boundary}--`;
             
@@ -675,7 +667,7 @@
                 method: fileIdToUpdate ? 'PATCH' : 'POST',
                 params: { uploadType: 'multipart' },
                 headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
-                body: multipartRequestBody
+                body: requestBody
             });
             const response = await request;
             return response.result.id;
