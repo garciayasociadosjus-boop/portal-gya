@@ -201,12 +201,15 @@
             updateDataStatus('✅ Datos guardados localmente');
         }
 
+        // --- FUNCIÓN DE CARGA CON MECANISMO DE AUTO-REPARACIÓN ---
         function loadData() {
             const savedData = localStorage.getItem('planilla_juridica_data');
             let data = savedData ? JSON.parse(savedData) : [];
 
+            // Usamos un Map para garantizar expedientes únicos.
             const uniqueClients = new Map();
             data.forEach(client => {
+                // La clave será el N° de Expediente si existe y no está vacío, sino el ID del cliente.
                 const key = (client.expediente && String(client.expediente).trim() !== '') ? String(client.expediente).trim() : client.id;
                 if (!uniqueClients.has(key)) {
                     uniqueClients.set(key, client);
@@ -215,17 +218,23 @@
             const deduplicatedData = Array.from(uniqueClients.values());
 
             let statusMessage = savedData ? '✅ Datos cargados desde almacenamiento local' : '📋 Planilla lista. Agregue su primer caso.';
+            let needsSave = false;
+            
+            // Si se eliminaron duplicados, se notifica y se prepara para guardar.
             if (deduplicatedData.length < data.length) {
                 console.warn(`Se eliminaron ${data.length - deduplicatedData.length} expedientes duplicados.`);
                 statusMessage = `⚠️ Se repararon ${data.length - deduplicatedData.length} casos duplicados.`;
+                needsSave = true;
             }
 
             clientsData = sanitizeData(deduplicatedData);
             
-            if (deduplicatedData.length < data.length) {
-                saveData(); // Guardar la lista limpia inmediatamente
+            // Si el archivo fue reparado, se guarda la versión limpia inmediatamente.
+            if (needsSave) {
+                saveData();
             }
-            updateDataStatus(statusMessage, deduplicatedData.length < data.length);
+            
+            updateDataStatus(statusMessage, needsSave);
         }
 
         function sanitizeData(data) {
@@ -303,7 +312,8 @@
 
         function renderReviewList(containerId, tasks, emptyMsg, type) {
             const container = document.getElementById(containerId);
-            container.innerHTML = tasks.length === 0 ? `<p style="color: rgba(0,0,0,0.6); text-align: center;">${emptyMsg}</p>` : tasks.map(task => {
+            const listColor = (type === 'today' || type === 'overdue' || type === 'pending-reviews') ? 'var(--light-text)' : 'rgba(0,0,0,0.6)';
+            container.innerHTML = tasks.length === 0 ? `<p style="color: ${listColor}; text-align: center;">${emptyMsg}</p>` : tasks.map(task => {
                 let dateInfo = '';
                 if (type === 'today') dateInfo = 'HOY';
                 else if (type === 'overdue') dateInfo = `VENCIDA - ${formatDate(task.proximaRevision)}`;
