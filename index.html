@@ -189,14 +189,38 @@
         let clientsData = [];
         let editingClientId = null, editingField = null;
 
-        function saveData() { localStorage.setItem('planilla_juridica_data', JSON.stringify(clientsData)); updateDataStatus('✅ Datos guardados localmente'); }
+        function saveData() {
+            localStorage.setItem('planilla_juridica_data', JSON.stringify(clientsData));
+            updateDataStatus('✅ Datos guardados localmente');
+        }
+
+        // --- FUNCIÓN CORREGIDA CON AUTO-REPARACIÓN ---
         function loadData() {
             const savedData = localStorage.getItem('planilla_juridica_data');
-            let data = savedData ? JSON.parse(savedData) : JSON.parse(JSON.stringify(initialData));
-            clientsData = sanitizeData(data);
-            if (!savedData && clientsData.length > 0) saveData();
+            let data = savedData ? JSON.parse(savedData) : [];
+
+            // Mecanismo de auto-reparación para eliminar duplicados
+            const uniqueClients = new Map();
+            data.forEach(client => {
+                // Usar el N° de Expediente como clave única. Si no existe, usar el ID para no perder el caso.
+                const key = (client.expediente && client.expediente.trim() !== '') ? client.expediente.trim() : client.id;
+                if (!uniqueClients.has(key)) {
+                    uniqueClients.set(key, client);
+                }
+            });
+            const deduplicatedData = Array.from(uniqueClients.values());
+
+            // Si se encontraron y eliminaron duplicados, se repara el archivo guardado
+            if (deduplicatedData.length < data.length) {
+                console.warn(`Se eliminaron ${data.length - deduplicatedData.length} expedientes duplicados.`);
+                localStorage.setItem('planilla_juridica_data', JSON.stringify(deduplicatedData));
+                updateDataStatus('⚠️ Se encontraron y eliminaron expedientes duplicados.', true);
+            }
+
+            clientsData = sanitizeData(deduplicatedData);
             updateDataStatus(savedData ? '✅ Datos cargados desde almacenamiento local' : '📋 Planilla lista. Agregue su primer caso.');
         }
+
         function sanitizeData(data) {
             (data || []).forEach(c => {
                 if (!c.id) { c.id = generateId(c); }
@@ -210,11 +234,11 @@
             return data;
         }
 
-        function updateDataStatus(message, isError = false) {
+        function updateDataStatus(message, isWarning = false) {
             const el = document.getElementById('dataStatus');
             el.textContent = message;
-            el.style.background = isError ? '#f8d7da' : '#d4edda';
-            el.style.color = isError ? '#721c24' : '#155724';
+            el.style.background = isWarning ? '#fff3cd' : '#d4edda';
+            el.style.color = isWarning ? '#664d03' : '#155724';
         }
         
         function getTodayYMD() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
@@ -429,11 +453,13 @@
             document.getElementById('newClientModal').querySelector('.modal-content').innerHTML = `<span class="close" onclick="closeModal('newClientModal')">&times;</span><h2>➕ Agregar Nuevo Caso</h2><form id="newClientForm"><div class="info-grid"><div class="form-group"><label>Actor *</label><input type="text" id="newActor" required></div><div class="form-group"><label>Demandado *</label><input type="text" id="newDemandado" required></div><div class="form-group"><label>N° Expediente</label><input type="text" id="newExpediente"></div><div class="form-group"><label>Juzgado</label><input type="text" id="newJuzgado"></div><div class="form-group"><label>Estado *</label><select id="newEstado" required><option value="INICIADO">Iniciado</option><option value="EN LETRA">En Letra</option><option value="FINALIZADO">Finalizado</option><option value="MEDIACION">Mediación</option><option value="APELADO">Apelado</option></select></div></div><div class="form-group" style="margin-top:20px;"><label>Tarea Inicial (Opcional)</label><textarea id="newObservacion" rows="3"></textarea></div><div class="form-group"><label>Fecha de Revisión para Tarea Inicial</label><input type="date" id="newFechaRevision"></div><div style="text-align:center;"><button type="submit" class="btn btn-success">💾 Guardar Caso</button></div></form>`;
             document.getElementById('clientSelectorModal').querySelector('.modal-content').innerHTML = `<span class="close" onclick="closeModal('clientSelectorModal')">&times;</span><h2>👁️ Seleccionar Caso</h2><div class="form-group"><select id="clientSelector" onchange="loadClientInfo()"></select></div>`;
             
-            // --- CORRECCIÓN AQUÍ: AÑADIR LA VERIFICACIÓN DE EXPEDIENTE DUPLICADO ---
             document.getElementById('newClientForm').addEventListener('submit', function(e) {
                 e.preventDefault();
-                const expedienteValue = document.getElementById('newExpediente').value;
-                if (expedienteValue && clientsData.some(client => client.expediente === expedienteValue)) {
+                
+                const expedienteInput = document.getElementById('newExpediente');
+                const expedienteValue = expedienteInput.value.trim();
+
+                if (expedienteValue && clientsData.some(client => client.expediente && client.expediente.trim() === expedienteValue)) {
                     alert(`Error: Ya existe un caso con el número de expediente "${expedienteValue}".\nPor favor, verifique los datos.`);
                     return;
                 }
