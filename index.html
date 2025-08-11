@@ -326,7 +326,7 @@
                 else if (type === 'overdue') dateInfo = `VENCIDA - ${formatDate(task.proximaRevision)}`;
                 else dateInfo = `En ${getDaysDifference(task.proximaRevision)} días - ${formatDate(task.proximaRevision)}`;
                 
-                return `<div class="review-item"><button class="complete-btn" onclick="toggleCompleted(event, '${task.client.id}', '${task.id}')">✔</button><div class="review-item-content" onclick="showClientModal('${task.client.id}')"><div class="review-date">${dateInfo}</div><div class="review-client">${task.client.nombre} | ${task.client.caratula}</div><div class="review-obs">${task.texto}</div></div></div>`;
+                return `<div class="review-item"><button class="complete-btn" onclick="toggleCompleted(event, '${task.client.id}', '${task.id}')">✔</button><div class="review-item-content" onclick="showClientModal('${task.client.id}')"><div class="review-date">${dateInfo}</div><div class="review-client">${task.client.nombre} | ${task.client.caratula || 'Sin Carátula'}</div><div class="review-obs">${task.texto}</div></div></div>`;
             }).join('');
         }
         
