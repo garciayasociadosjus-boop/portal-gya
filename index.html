@@ -307,26 +307,43 @@
         }
 
         function renderDashboardLists() {
-            const allTasks = clientsData.flatMap(client => (client.observaciones || []).map(obs => ({...obs, client})));
-            const todayTasks = allTasks.filter(task => !task.completed && isToday(task.proximaRevision));
-            const overdueTasks = allTasks.filter(task => !task.completed && isPastDue(task.proximaRevision)).sort((a,b) => a.proximaRevision.localeCompare(b.proximaRevision));
-            const upcomingTasks = allTasks.filter(task => !task.completed && getDaysDifference(task.proximaRevision) > 0).sort((a,b) => a.proximaRevision.localeCompare(b.proximaRevision));
+            const allSchedulableItems = clientsData.flatMap(client => {
+                const tasks = (client.observaciones || [])
+                    .filter(obs => !obs.completed && obs.proximaRevision)
+                    .map(obs => ({
+                        id: obs.id, client: client, reviewDate: obs.proximaRevision,
+                        reviewText: obs.texto, isCompletable: true, type: 'task'
+                    }));
+                const audiences = (client.audiencias_list || [])
+                    .filter(aud => aud.fecha)
+                    .map(aud => ({
+                        id: aud.id, client: client, reviewDate: aud.fecha,
+                        reviewText: `AUDIENCIA: ${aud.texto}`, isCompletable: false, type: 'audience'
+                    }));
+                return [...tasks, ...audiences];
+            });
 
-            renderReviewList('todayReviews', todayTasks, 'No hay revisiones para hoy', 'today');
-            renderReviewList('overdueReviews', overdueTasks, 'No hay revisiones vencidas', 'overdue');
-            renderReviewList('upcomingReviews', upcomingTasks, 'No hay próximas revisiones', 'upcoming');
+            const todayItems = allSchedulableItems.filter(item => isToday(item.reviewDate));
+            const overdueItems = allSchedulableItems.filter(item => isPastDue(item.reviewDate)).sort((a, b) => a.reviewDate.localeCompare(b.reviewDate));
+            const upcomingItems = allSchedulableItems.filter(item => getDaysDifference(item.reviewDate) > 0).sort((a, b) => a.reviewDate.localeCompare(b.reviewDate));
+
+            renderReviewList('todayReviews', todayItems, 'No hay revisiones para hoy', 'today');
+            renderReviewList('overdueReviews', overdueItems, 'No hay revisiones vencidas', 'overdue');
+            renderReviewList('upcomingReviews', upcomingItems, 'No hay próximas revisiones', 'upcoming');
         }
 
-        function renderReviewList(containerId, tasks, emptyMsg, type) {
+        function renderReviewList(containerId, items, emptyMsg, type) {
             const container = document.getElementById(containerId);
             const listColor = (type === 'today' || type === 'overdue' || type === 'pending-reviews') ? 'var(--light-text)' : 'rgba(0,0,0,0.6)';
-            container.innerHTML = tasks.length === 0 ? `<p style="color: ${listColor}; text-align: center;">${emptyMsg}</p>` : tasks.map(task => {
+            container.innerHTML = items.length === 0 ? `<p style="color: ${listColor}; text-align: center;">${emptyMsg}</p>` : items.map(item => {
                 let dateInfo = '';
                 if (type === 'today') dateInfo = 'HOY';
-                else if (type === 'overdue') dateInfo = `VENCIDA - ${formatDate(task.proximaRevision)}`;
-                else dateInfo = `En ${getDaysDifference(task.proximaRevision)} días - ${formatDate(task.proximaRevision)}`;
+                else if (type === 'overdue') dateInfo = `VENCIDA - ${formatDate(item.reviewDate)}`;
+                else dateInfo = `En ${getDaysDifference(item.reviewDate)} días - ${formatDate(item.reviewDate)}`;
                 
-                return `<div class="review-item"><button class="complete-btn" onclick="toggleCompleted(event, '${task.client.id}', '${task.id}')">✔</button><div class="review-item-content" onclick="showClientModal('${task.client.id}')"><div class="review-date">${dateInfo}</div><div class="review-client">${task.client.nombre} | ${task.client.caratula || 'Sin Carátula'}</div><div class="review-obs">${task.texto}</div></div></div>`;
+                const completeButton = item.isCompletable ? `<button class="complete-btn" onclick="toggleCompleted(event, '${item.client.id}', '${item.id}')">✔</button>` : `<div style="width:30px; flex-shrink:0;"></div>`;
+                
+                return `<div class="review-item">${completeButton}<div class="review-item-content" onclick="showClientModal('${item.client.id}')"><div class="review-date">${dateInfo}</div><div class="review-client">${item.client.nombre} | ${item.client.caratula || 'Sin Carátula'}</div><div class="review-obs">${item.reviewText}</div></div></div>`;
             }).join('');
         }
         
@@ -396,9 +413,10 @@
 
             return combinedHistory.length === 0 ? '<p>No hay tareas ni audiencias registradas.</p>' : combinedHistory.map(item => {
                 if (item.type === 'task') {
-                    return `<div class="history-item history-item-task ${item.completed ? 'completed' : ''}">
+                    return `<div id="task-item-${item.id}" class="history-item history-item-task ${item.completed ? 'completed' : ''}">
                         <div class="history-date">Revisar el: ${formatDate(item.proximaRevision)} <span class="history-tag tag-task">TAREA</span></div>
                         <div class="history-text">${item.texto}</div>
+                        <button class="btn btn-sm" onclick="editObs('${client.id}', '${item.id}')">Editar</button>
                         <button class="btn btn-danger btn-sm" onclick="deleteObs('${client.id}', '${item.id}')">Eliminar</button>
                     </div>`;
                 } else { // type === 'audience'
@@ -409,6 +427,28 @@
                     </div>`;
                 }
             }).join('');
+        }
+        
+        function editObs(clientId, obsId) {
+            const obs = clientsData.find(c => c.id === clientId).observaciones.find(o => o.id === obsId);
+            const itemElement = document.getElementById(`task-item-${obsId}`);
+            itemElement.innerHTML = `
+                <div class="form-group"><label>Texto</label><textarea id="edit-obs-text-${obsId}" rows="2" class="form-group input">${obs.texto}</textarea></div>
+                <div class="form-group"><label>Fecha Revisión</label><input type="date" id="edit-obs-revision-${obsId}" value="${obs.proximaRevision}" class="form-group input"></div>
+                <button class="btn btn-success btn-sm" onclick="saveObsEdit('${clientId}', '${obsId}')">Guardar</button>
+                <button class="btn btn-sm" onclick="showClientModal('${clientId}')">Cancelar</button>
+            `;
+        }
+
+        function saveObsEdit(clientId, obsId) {
+            const client = clientsData.find(c => c.id === clientId);
+            const obs = client.observaciones.find(o => o.id === obsId);
+            obs.texto = document.getElementById(`edit-obs-text-${obsId}`).value;
+            obs.proximaRevision = document.getElementById(`edit-obs-revision-${obsId}`).value;
+            updateClientNextRevision(client);
+            saveData();
+            renderAll();
+            showClientModal(clientId);
         }
         
         function deleteObs(clientId, obsId) {
