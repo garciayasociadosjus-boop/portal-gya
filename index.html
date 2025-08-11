@@ -142,6 +142,7 @@
 
         <main class="main-content">
             <div id="dataStatus" class="data-status">Cargando datos...</div>
+            <div id="driveStatus" class="data-status" style="display: none;"></div>
 
             <section class="dashboard">
                 <div class="card today-reviews">
@@ -164,6 +165,12 @@
                 <button class="btn" onclick="exportToExcel()">📊 Exportar a Excel</button>
                 <button class="btn btn-info" onclick="exportData()">💾 Exportar JSON</button>
                 <button class="btn btn-warning" onclick="importData()">📥 Importar Datos</button>
+            </section>
+            
+            <section style="text-align: center; margin-bottom: 30px; border-top: 1px solid #ddd; padding-top: 20px;">
+                <button id="connectDriveBtn" class="btn">🔗 Conectar a Drive</button>
+                <button id="saveToDriveBtn" class="btn btn-success" style="display:none;">📤 Guardar en Drive</button>
+                <button id="loadFromDriveBtn" class="btn btn-warning" style="display:none;">📥 Cargar de Drive</button>
             </section>
 
             <section class="filter-bar">
@@ -194,40 +201,40 @@
             updateDataStatus('✅ Datos guardados localmente');
         }
 
-        // --- FUNCIÓN CORREGIDA CON AUTO-REPARACIÓN ---
         function loadData() {
             const savedData = localStorage.getItem('planilla_juridica_data');
             let data = savedData ? JSON.parse(savedData) : [];
 
-            // Mecanismo de auto-reparación para eliminar duplicados
             const uniqueClients = new Map();
             data.forEach(client => {
-                // Usar el N° de Expediente como clave única. Si no existe, usar el ID para no perder el caso.
-                const key = (client.expediente && client.expediente.trim() !== '') ? client.expediente.trim() : client.id;
+                const key = (client.expediente && String(client.expediente).trim() !== '') ? String(client.expediente).trim() : client.id;
                 if (!uniqueClients.has(key)) {
                     uniqueClients.set(key, client);
                 }
             });
             const deduplicatedData = Array.from(uniqueClients.values());
 
-            // Si se encontraron y eliminaron duplicados, se repara el archivo guardado
+            let statusMessage = savedData ? '✅ Datos cargados desde almacenamiento local' : '📋 Planilla lista. Agregue su primer caso.';
             if (deduplicatedData.length < data.length) {
                 console.warn(`Se eliminaron ${data.length - deduplicatedData.length} expedientes duplicados.`);
-                localStorage.setItem('planilla_juridica_data', JSON.stringify(deduplicatedData));
-                updateDataStatus('⚠️ Se encontraron y eliminaron expedientes duplicados.', true);
+                statusMessage = `⚠️ Se repararon ${data.length - deduplicatedData.length} casos duplicados.`;
             }
 
             clientsData = sanitizeData(deduplicatedData);
-            updateDataStatus(savedData ? '✅ Datos cargados desde almacenamiento local' : '📋 Planilla lista. Agregue su primer caso.');
+            
+            if (deduplicatedData.length < data.length) {
+                saveData(); // Guardar la lista limpia inmediatamente
+            }
+            updateDataStatus(statusMessage, deduplicatedData.length < data.length);
         }
 
         function sanitizeData(data) {
             (data || []).forEach(c => {
-                if (!c.id) { c.id = generateId(c); }
-                if (!Array.isArray(c.observaciones)) { c.observaciones = []; }
+                c.id = c.id || generateId(c);
+                c.observaciones = Array.isArray(c.observaciones) ? c.observaciones : [];
                 c.observaciones.forEach(obs => {
-                    if (!obs.id) { obs.id = generateId({}); }
-                    if (typeof obs.completed === 'undefined') { obs.completed = false; }
+                    obs.id = obs.id || generateId({});
+                    obs.completed = typeof obs.completed === 'boolean' ? obs.completed : false;
                 });
                 updateClientNextRevision(c);
             });
@@ -296,7 +303,7 @@
 
         function renderReviewList(containerId, tasks, emptyMsg, type) {
             const container = document.getElementById(containerId);
-            container.innerHTML = tasks.length === 0 ? `<p style="color: rgba(255,255,255,0.8); text-align: center;">${emptyMsg}</p>` : tasks.map(task => {
+            container.innerHTML = tasks.length === 0 ? `<p style="color: rgba(0,0,0,0.6); text-align: center;">${emptyMsg}</p>` : tasks.map(task => {
                 let dateInfo = '';
                 if (type === 'today') dateInfo = 'HOY';
                 else if (type === 'overdue') dateInfo = `VENCIDA - ${formatDate(task.proximaRevision)}`;
@@ -496,6 +503,84 @@
             renderAll();
         });
         window.addEventListener('click', e => { if (e.target.classList.contains('modal')) closeModal(e.target.id); });
+    </script>
+    
+    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+    <script>
+        const CLIENT_ID = '976943805178-lr5pvivhpstfnjp4leoolopo0kvb1cif.apps.googleusercontent.com';
+        const API_KEY = 'AIzaSyDSMWMM3lJM4ZNqRezhH-8uxaE1GVOjrrM';
+        const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+        const DATA_FILE_NAME = 'datos_planilla_juridica.json';
+
+        let tokenClient, gapiInited = false, gisInited = false, dataFileId = null;
+        const driveStatusEl = document.getElementById('driveStatus'), connectDriveBtn = document.getElementById('connectDriveBtn'), saveToDriveBtn = document.getElementById('saveToDriveBtn'), loadFromDriveBtn = document.getElementById('loadFromDriveBtn');
+
+        function gapiLoaded() { gapi.load('client', initializeGapiClient); }
+        async function initializeGapiClient() { await gapi.client.init({ apiKey: API_KEY, discoveryDocs: [DISCOVERY_DOC] }); gapiInited = true; maybeEnableButtons(); }
+        function gisLoaded() { tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: '' }); gisInited = true; maybeEnableButtons(); }
+        function maybeEnableButtons() { if (gapiInited && gisInited) connectDriveBtn.onclick = handleAuthClick; }
+        function updateDriveStatus(message, isConnected = false) { driveStatusEl.style.display = 'block'; driveStatusEl.textContent = message; driveStatusEl.style.background = isConnected ? '#d1e7dd' : '#fff3cd'; driveStatusEl.style.color = isConnected ? '#0f5132' : '#664d03'; }
+
+        function handleAuthClick() {
+            tokenClient.callback = async (resp) => {
+                if (resp.error) throw (resp);
+                updateDriveStatus('✅ Conectado a Google Drive', true);
+                connectDriveBtn.style.display = 'none'; saveToDriveBtn.style.display = 'inline-block'; loadFromDriveBtn.style.display = 'inline-block';
+                saveToDriveBtn.onclick = saveDataToDrive; loadFromDriveBtn.onclick = loadDataFromDrive;
+                await findDataFile();
+            };
+            if (gapi.client.getToken() === null) tokenClient.requestAccessToken({prompt: 'consent'}); else tokenClient.requestAccessToken({prompt: ''});
+        }
+        async function findDataFile() {
+            updateDriveStatus('Buscando archivo de datos en Drive...', false);
+            try {
+                const response = await gapi.client.drive.files.list({ q: `name='${DATA_FILE_NAME}' and trashed=false`, fields: 'files(id, name)', spaces: 'drive' });
+                if (response.result.files.length > 0) { dataFileId = response.result.files[0].id; updateDriveStatus('✅ Archivo de datos encontrado en Drive.', true); }
+                else { updateDriveStatus('⚠️ Archivo no encontrado. Se creará uno nuevo al guardar.', false); dataFileId = null; }
+            } catch (err) { console.error(err); alert('Error al buscar el archivo de datos en Drive.'); }
+        }
+        async function saveDataToDrive() {
+            if (!confirm('¿Guardar los datos actuales en Google Drive? Esto sobreescribirá la versión anterior en la nube.')) return;
+            updateDriveStatus('Guardando datos en Drive...', false);
+            const content = JSON.stringify(clientsData, null, 2);
+            const blob = new Blob([content], { type: 'application/json' });
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify({ name: DATA_FILE_NAME })], { type: 'application/json' }));
+            form.append('file', blob);
+
+            let url = 'https://www.googleapis.com/upload/drive/v3/files';
+            let method = 'POST';
+            if (dataFileId) {
+                url += `/${dataFileId}`;
+                method = 'PATCH';
+            }
+            url += '?uploadType=multipart';
+
+            try {
+                const response = await fetch(url, { method, headers: new Headers({ 'Authorization': `Bearer ${gapi.client.getToken().access_token}` }), body: form });
+                const result = await response.json();
+                if (result.error) throw new Error(result.error.message);
+                dataFileId = result.id;
+                updateDriveStatus('✅ ¡Datos guardados en Drive con éxito!', true);
+            } catch (err) { console.error(err); updateDriveStatus('❌ Error al guardar en Drive.', false); alert('Error al guardar en Drive: ' + err.message); }
+        }
+        async function loadDataFromDrive() {
+            if (!dataFileId) return alert("No se ha encontrado un archivo de datos. Guarda primero para crear uno.");
+            if (!confirm("¿Seguro? Se reemplazarán los datos locales con los de Drive.")) return;
+            updateDriveStatus('Cargando datos desde Drive...', false);
+            try {
+                const response = await gapi.client.drive.files.get({ fileId: dataFileId, alt: 'media' });
+                const importedData = JSON.parse(response.body);
+                if (!Array.isArray(importedData)) throw new Error('Formato no válido.');
+                clientsData = importedData;
+                saveData(); // Guardar localmente los datos importados de Drive
+                loadData(); // Recargar los datos para aplicar la limpieza de duplicados si es necesario
+                renderAll();
+                updateDriveStatus('✅ Datos cargados desde Drive con éxito.', true);
+            } catch (err) { console.error(err); updateDriveStatus('❌ Error al cargar desde Drive.', false); alert('Error al cargar desde Drive: ' + err.message); }
+        }
     </script>
 </body>
 </html>
