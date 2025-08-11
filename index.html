@@ -175,7 +175,7 @@
 
             <section class="filter-bar">
                 <div class="form-group"><label>Búsqueda General</label><input type="text" id="searchInput" placeholder="Buscar por actor, demandado, exp, etc." onkeyup="renderAllClientsList()"></div>
-                <div class="form-group"><label>Filtrar por Estado</label><select id="estadoFilter" onchange="renderAllClientsList()"><option value="">Todos los estados</option><option value="INICIADO">Iniciado</option><option value="EN LETRA">En Letra</option><option value="FINALIZADO">Finalizado</option><option value="MEDIACION">Mediación</option><option value="APELADO">Apelado</option></select></div>
+                <div class="form-group"><label>Filtrar por Estado</label><select id="estadoFilter" onchange="renderAllClientsList()"><option value="">Todos los estados</option><option value="EJECUCION">Ejecución</option><option value="FINALIZADA">Finalizada</option><option value="FINALIZADA PARCIAL">Finalizada Parcial</option><option value="DEMORADA">Demorada</option></select></div>
             </section>
 
             <section class="card">
@@ -192,7 +192,6 @@
     <div id="clientInfoModal" class="modal"><div class="modal-content"></div></div>
     
     <script>
-        const initialData = [];
         let clientsData = [];
         let editingClientId = null, editingField = null;
 
@@ -201,15 +200,13 @@
             updateDataStatus('✅ Datos guardados localmente');
         }
 
-        // --- FUNCIÓN DE CARGA CON MECANISMO DE AUTO-REPARACIÓN ---
+        // --- FUNCIÓN DE CARGA CON AUTO-REPARACIÓN DE DUPLICADOS ---
         function loadData() {
             const savedData = localStorage.getItem('planilla_juridica_data');
             let data = savedData ? JSON.parse(savedData) : [];
 
-            // Usamos un Map para garantizar expedientes únicos.
             const uniqueClients = new Map();
             data.forEach(client => {
-                // La clave será el N° de Expediente si existe y no está vacío, sino el ID del cliente.
                 const key = (client.expediente && String(client.expediente).trim() !== '') ? String(client.expediente).trim() : client.id;
                 if (!uniqueClients.has(key)) {
                     uniqueClients.set(key, client);
@@ -217,21 +214,18 @@
             });
             const deduplicatedData = Array.from(uniqueClients.values());
 
-            let statusMessage = savedData ? '✅ Datos cargados desde almacenamiento local' : '📋 Planilla lista. Agregue su primer caso.';
+            let statusMessage = savedData ? '✅ Datos cargados' : '📋 Planilla lista';
             let needsSave = false;
             
-            // Si se eliminaron duplicados, se notifica y se prepara para guardar.
             if (deduplicatedData.length < data.length) {
-                console.warn(`Se eliminaron ${data.length - deduplicatedData.length} expedientes duplicados.`);
                 statusMessage = `⚠️ Se repararon ${data.length - deduplicatedData.length} casos duplicados.`;
                 needsSave = true;
             }
 
             clientsData = sanitizeData(deduplicatedData);
             
-            // Si el archivo fue reparado, se guarda la versión limpia inmediatamente.
             if (needsSave) {
-                saveData();
+                saveData(); // Guarda la lista limpia inmediatamente
             }
             
             updateDataStatus(statusMessage, needsSave);
@@ -264,8 +258,8 @@
         function isPastDue(dateString) { return dateString && dateString < todayYMD; }
         function getDaysDifference(dateString) { if (!dateString) return 999; const today = new Date(todayYMD); const target = new Date(dateString); return Math.ceil((target - today) / (1000 * 60 * 60 * 24)); }
         
-        function generateId(item) { return `CLI_${(item.actor || 'A').slice(0,3).toUpperCase()}_${Date.now()}`; }
-        function getDisplayName(c) { return `${c.actor} vs ${c.demandado} - Exp: ${c.expediente || 'S/N'}`; }
+        function generateId(item) { return `CLI_${(item.nombre || 'N').slice(0,3).toUpperCase()}_${Date.now()}`; }
+        function getDisplayName(c) { return `${c.nombre || 'Sin Nombre'} - Exp: ${c.expediente || 'S/N'}`; }
 
         function updateClientNextRevision(client) {
             const futureObs = (client.observaciones || [])
@@ -273,10 +267,10 @@
                 .sort((a, b) => a.proximaRevision.localeCompare(b.proximaRevision));
             
             if (futureObs.length > 0) {
-                client.fechaRevision = futureObs[0].proximaRevision;
+                client.proximaRevision = futureObs[0].proximaRevision;
                 client.observacion = futureObs[0].texto;
             } else {
-                client.fechaRevision = '';
+                client.proximaRevision = '';
                 client.observacion = 'No hay tareas pendientes';
             }
         }
@@ -319,7 +313,7 @@
                 else if (type === 'overdue') dateInfo = `VENCIDA - ${formatDate(task.proximaRevision)}`;
                 else dateInfo = `En ${getDaysDifference(task.proximaRevision)} días - ${formatDate(task.proximaRevision)}`;
                 
-                return `<div class="review-item"><button class="complete-btn" onclick="toggleCompleted(event, '${task.client.id}', '${task.id}')">✔</button><div class="review-item-content" onclick="showClientModal('${task.client.id}')"><div class="review-date">${dateInfo}</div><div class="review-client">${task.client.actor} vs ${task.client.demandado}</div><div class="review-obs">${task.texto}</div></div></div>`;
+                return `<div class="review-item"><button class="complete-btn" onclick="toggleCompleted(event, '${task.client.id}', '${task.id}')">✔</button><div class="review-item-content" onclick="showClientModal('${task.client.id}')"><div class="review-date">${dateInfo}</div><div class="review-client">${getDisplayName(task.client)}</div><div class="review-obs">${task.texto}</div></div></div>`;
             }).join('');
         }
         
@@ -327,23 +321,23 @@
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
             const estadoFilter = document.getElementById('estadoFilter').value;
             const filteredData = clientsData.filter(c => {
-                const searchString = `${c.actor} ${c.demandado} ${c.expediente} ${c.juzgado} ${c.estado}`.toLowerCase();
+                const searchString = `${c.nombre} ${c.caratula} ${c.expediente} ${c.juzgado} ${c.estado}`.toLowerCase();
                 const matchesSearch = !searchTerm || searchString.includes(searchTerm);
                 const matchesEstado = !estadoFilter || c.estado === estadoFilter;
                 return matchesSearch && matchesEstado;
-            }).sort((a, b) => (a.fechaRevision || '9999').localeCompare(b.fechaRevision || '9999'));
+            }).sort((a, b) => (a.proximaRevision || '9999').localeCompare(b.proximaRevision || '9999'));
 
             document.getElementById('allClients').innerHTML = filteredData.length === 0 ? '<p>No se encontraron casos.</p>' : filteredData.map(c => {
                 const hasPendingTask = (c.observaciones || []).some(obs => !obs.completed && obs.proximaRevision);
-                const classes = `review-item ${!hasPendingTask ? 'completed' : ''} ${isToday(c.fechaRevision) ? 'today' : ''} ${isPastDue(c.fechaRevision) ? 'overdue' : ''}`;
-                return `<div class="${classes}" onclick="showClientModal('${c.id}')"><div class="review-item-content"><div class="review-date">Próx. Revisión: ${formatDate(c.fechaRevision)}</div><div class="review-client">${getDisplayName(c)}</div><div class="review-obs">Últ. Tarea: ${c.observacion}</div></div></div>`;
+                const classes = `review-item ${!hasPendingTask ? 'completed' : ''} ${isToday(c.proximaRevision) ? 'today' : ''} ${isPastDue(c.proximaRevision) ? 'overdue' : ''}`;
+                return `<div class="${classes}" onclick="showClientModal('${c.id}')"><div class="review-item-content"><div class="review-date">Próx. Revisión: ${formatDate(c.proximaRevision)}</div><div class="review-client">${getDisplayName(c)}</div><div class="review-obs">Últ. Tarea: ${c.observacion}</div></div></div>`;
             }).join('');
         }
 
         function showNewClientModal() { document.getElementById('newClientModal').classList.add('active'); }
         function showClientSelectorModal() {
             const selector = document.getElementById('clientSelector');
-            selector.innerHTML = '<option value="">-- Seleccionar Caso --</option>' + [...clientsData].sort((a,b) => a.actor.localeCompare(b.actor)).map(c => `<option value="${c.id}">${getDisplayName(c)}</option>`).join('');
+            selector.innerHTML = '<option value="">-- Seleccionar Caso --</option>' + [...clientsData].sort((a,b) => (a.nombre || '').localeCompare(b.nombre || '')).map(c => `<option value="${c.id}">${getDisplayName(c)}</option>`).join('');
             document.getElementById('clientSelectorModal').classList.add('active');
         }
         function loadClientInfo() { const clientId = document.getElementById('clientSelector').value; if (clientId) { closeModal('clientSelectorModal'); showClientModal(clientId); } }
@@ -358,9 +352,9 @@
                 <div class="client-info">
                     <h4>📋 Información del Caso</h4>
                     <div class="info-grid">
-                        ${Object.entries({actor: 'Actor', demandado: 'Demandado', expediente: 'N° Expediente', juzgado: 'Juzgado', estado: 'Estado'}).map(([key, label]) => `
+                        ${Object.entries({nombre: 'Nombre', dni: 'DNI', telefono: 'Teléfono', caratula: 'Carátula', expediente: 'N° Expediente', juzgado: 'Juzgado', direccionJuzgado: 'Dirección Juzgado', telJuzgado: 'Tel. Juzgado', estado: 'Estado', audiencias: 'Audiencias'}).map(([key, label]) => `
                         <div class="info-item"><div class="info-label">${label}</div><div class="editable-field" id="field-${key}" onclick="editField('${client.id}', '${key}', '${String(client[key] || '').replace(/'/g, '&#39;')}')"><div class="info-value">${client[key] || 'S/D'}</div></div></div>`).join('')}
-                        <div class="info-item"><div class="info-label">Próxima Tarea</div><div class="info-value" style="color: var(--danger-color); font-weight: bold;">${formatDate(client.fechaRevision)}</div></div>
+                        <div class="info-item"><div class="info-label">Próxima Tarea</div><div class="info-value" style="color: var(--danger-color); font-weight: bold;">${formatDate(client.proximaRevision)}</div></div>
                     </div>
                 </div>
                 <div class="observations-history">
@@ -377,7 +371,7 @@
 
         function renderObsList(client) {
             return (client.observaciones || []).length === 0 ? '<p>No hay tareas registradas.</p>' : [...client.observaciones].sort((a, b) => (b.proximaRevision || '').localeCompare(a.proximaRevision || '')).map(obs => {
-                const isNextTask = obs.proximaRevision === client.fechaRevision && !obs.completed;
+                const isNextTask = obs.proximaRevision === client.proximaRevision && !obs.completed;
                 return `<div id="obs-item-${obs.id}" class="obs-item ${obs.completed ? 'completed' : ''}" style="${isNextTask ? 'border-left: 5px solid var(--danger-color);' : ''}">
                     <div class="obs-date">Creada: ${formatDate(obs.fecha)}</div>
                     <div class="obs-text">${obs.texto}</div>
@@ -450,7 +444,7 @@
         function exportToExcel() {
             const excelData = clientsData.map(c => {
                 const allObs = (c.observaciones || []).map(obs => `[${formatDate(obs.fecha)}] (Revisar: ${formatDate(obs.proximaRevision)}): ${obs.texto}`).join(' \n ');
-                return { 'Actor': c.actor, 'Demandado': c.demandado, 'Expediente': c.expediente, 'Juzgado': c.juzgado, 'Estado': c.estado, 'Próxima Revisión': formatDate(c.fechaRevision), 'Última Tarea': c.observacion, 'Historial Completo': allObs };
+                return { 'Nombre': c.nombre, 'DNI': c.dni, 'Teléfono': c.telefono, 'Carátula': c.caratula, 'Expediente': c.expediente, 'Juzgado': c.juzgado, 'Dirección Juzgado': c.direccionJuzgado, 'Tel. Juzgado': c.telJuzgado, 'Estado': c.estado, 'Próxima Revisión': formatDate(c.proximaRevision), 'Última Tarea': c.observacion, 'Audiencias': c.audiencias, 'Historial Completo': allObs };
             });
             const worksheet = XLSX.utils.json_to_sheet(excelData);
             const workbook = XLSX.utils.book_new();
@@ -462,12 +456,12 @@
         function handleImport(event) {
             const file = event.target.files[0]; if (!file) return;
             const reader = new FileReader();
-            reader.onload = e => { try { const imported = JSON.parse(e.target.result); if (Array.isArray(imported) && confirm(`¿Importar ${imported.length} casos? Esto sobreescribirá los datos actuales.`)) { clientsData = imported; saveData(); renderAll(); } } catch (err) { alert('Error al importar el archivo. Verifique que sea un JSON válido.'); } };
+            reader.onload = e => { try { const imported = JSON.parse(e.target.result); if (Array.isArray(imported) && confirm(`¿Importar ${imported.length} casos? Esto sobreescribirá los datos actuales.`)) { clientsData = imported; saveData(); loadData(); renderAll(); } } catch (err) { alert('Error al importar el archivo. Verifique que sea un JSON válido.'); } };
             reader.readAsText(file); event.target.value = '';
         }
         
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('newClientModal').querySelector('.modal-content').innerHTML = `<span class="close" onclick="closeModal('newClientModal')">&times;</span><h2>➕ Agregar Nuevo Caso</h2><form id="newClientForm"><div class="info-grid"><div class="form-group"><label>Actor *</label><input type="text" id="newActor" required></div><div class="form-group"><label>Demandado *</label><input type="text" id="newDemandado" required></div><div class="form-group"><label>N° Expediente</label><input type="text" id="newExpediente"></div><div class="form-group"><label>Juzgado</label><input type="text" id="newJuzgado"></div><div class="form-group"><label>Estado *</label><select id="newEstado" required><option value="INICIADO">Iniciado</option><option value="EN LETRA">En Letra</option><option value="FINALIZADO">Finalizado</option><option value="MEDIACION">Mediación</option><option value="APELADO">Apelado</option></select></div></div><div class="form-group" style="margin-top:20px;"><label>Tarea Inicial (Opcional)</label><textarea id="newObservacion" rows="3"></textarea></div><div class="form-group"><label>Fecha de Revisión para Tarea Inicial</label><input type="date" id="newFechaRevision"></div><div style="text-align:center;"><button type="submit" class="btn btn-success">💾 Guardar Caso</button></div></form>`;
+            document.getElementById('newClientModal').querySelector('.modal-content').innerHTML = `<span class="close" onclick="closeModal('newClientModal')">&times;</span><h2>➕ Agregar Nuevo Caso</h2><form id="newClientForm"><div class="info-grid" style="grid-template-columns: 1fr 1fr;"><div class="form-group"><label>Nombre *</label><input type="text" id="newNombre" required></div><div class="form-group"><label>DNI</label><input type="text" id="newDni"></div><div class="form-group"><label>Teléfono</label><input type="text" id="newTelefono"></div><div class="form-group"><label>Carátula</label><input type="text" id="newCaratula"></div><div class="form-group"><label>N° Expediente</label><input type="text" id="newExpediente"></div><div class="form-group"><label>Juzgado</label><input type="text" id="newJuzgado"></div><div class="form-group"><label>Dirección Juzgado</label><input type="text" id="newDireccionJuzgado"></div><div class="form-group"><label>Tel. Juzgado</label><input type="text" id="newTelJuzgado"></div><div class="form-group"><label>Estado *</label><select id="newEstado" required><option value="EJECUCION">Ejecución</option><option value="FINALIZADA">Finalizada</option><option value="FINALIZADA PARCIAL">Finalizada Parcial</option><option value="DEMORADA">Demorada</option></select></div><div class="form-group"><label>Audiencias</label><input type="text" id="newAudiencias"></div></div><div class="form-group" style="margin-top:20px;"><label>Tarea Inicial (Opcional)</label><textarea id="newObservacion" rows="3"></textarea></div><div class="form-group"><label>Fecha de Revisión para Tarea Inicial</label><input type="date" id="newFechaRevision"></div><div style="text-align:center;"><button type="submit" class="btn btn-success">💾 Guardar Caso</button></div></form>`;
             document.getElementById('clientSelectorModal').querySelector('.modal-content').innerHTML = `<span class="close" onclick="closeModal('clientSelectorModal')">&times;</span><h2>👁️ Seleccionar Caso</h2><div class="form-group"><select id="clientSelector" onchange="loadClientInfo()"></select></div>`;
             
             document.getElementById('newClientForm').addEventListener('submit', function(e) {
@@ -483,11 +477,16 @@
 
                 const newClient = {
                     id: generateId({}),
-                    actor: document.getElementById('newActor').value.toUpperCase(),
-                    demandado: document.getElementById('newDemandado').value.toUpperCase(),
+                    nombre: document.getElementById('newNombre').value.toUpperCase(),
+                    dni: document.getElementById('newDni').value,
+                    telefono: document.getElementById('newTelefono').value,
+                    caratula: document.getElementById('newCaratula').value,
                     expediente: expedienteValue,
-                    juzgado: document.getElementById('newJuzgado').value.toUpperCase(),
+                    juzgado: document.getElementById('newJuzgado').value,
+                    direccionJuzgado: document.getElementById('newDireccionJuzgado').value,
+                    telJuzgado: document.getElementById('newTelJuzgado').value,
                     estado: document.getElementById('newEstado').value,
+                    audiencias: document.getElementById('newAudiencias').value,
                     observaciones: []
                 };
                 const obsText = document.getElementById('newObservacion').value;
