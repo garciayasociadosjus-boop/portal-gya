@@ -219,7 +219,7 @@
 
             const uniqueClients = new Map();
             data.forEach(client => {
-                const key = (client.caratula && String(client.caratula).trim() !== '') ? String(client.caratula).trim() : client.id;
+                const key = (client.caratula && String(client.caratula).trim() !== '') ? String(client.caratula).trim().toUpperCase() : client.id;
                 if (!uniqueClients.has(key)) {
                     uniqueClients.set(key, client);
                 }
@@ -326,7 +326,7 @@
                 else if (type === 'overdue') dateInfo = `VENCIDA - ${formatDate(task.proximaRevision)}`;
                 else dateInfo = `En ${getDaysDifference(task.proximaRevision)} días - ${formatDate(task.proximaRevision)}`;
                 
-                return `<div class="review-item"><button class="complete-btn" onclick="toggleCompleted(event, '${task.client.id}', '${task.id}')">✔</button><div class="review-item-content" onclick="showClientModal('${task.client.id}')"><div class="review-date">${dateInfo}</div><div class="review-client">${task.client.nombre}</div><div class="review-obs">${task.texto}</div></div></div>`;
+                return `<div class="review-item"><button class="complete-btn" onclick="toggleCompleted(event, '${task.client.id}', '${task.id}')">✔</button><div class="review-item-content" onclick="showClientModal('${task.client.id}')"><div class="review-date">${dateInfo}</div><div class="review-client">${task.client.nombre} | ${task.client.caratula}</div><div class="review-obs">${task.texto}</div></div></div>`;
             }).join('');
         }
         
@@ -497,7 +497,7 @@
                 const caratulaInput = document.getElementById('newCaratula');
                 const caratulaValue = caratulaInput.value.trim();
 
-                if (caratulaValue && clientsData.some(client => client.caratula && client.caratula.trim() === caratulaValue)) {
+                if (caratulaValue && clientsData.some(client => client.caratula && client.caratula.trim().toUpperCase() === caratulaValue.toUpperCase())) {
                     alert(`Error: Ya existe un caso con la carátula "${caratulaValue}".\nPor favor, verifique los datos.`);
                     return;
                 }
