@@ -130,6 +130,13 @@
             background: var(--light-bg); padding: 20px; border-radius: 8px; margin-bottom: 20px;
             display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;
         }
+        .document-list { list-style: none; padding: 0; max-height: 250px; overflow-y: auto; }
+        .document-list li { background: #f1f3f5; padding: 10px; border-radius: 5px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .document-list a { color: #3498db; text-decoration: none; font-weight: 500; word-break: break-all; }
+        .document-list a:hover { text-decoration: underline; }
+        .document-list .btn-sm { flex-shrink: 0; margin-left: 10px; }
+        .document-list .spinner { display: block; margin: 20px auto; width: 30px; height: 30px; border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
         /* --- ESTILOS DE IMPRESIÓN --- */
         @media print {
@@ -153,6 +160,7 @@
 
         <main class="main-content">
             <div id="dataStatus" class="data-status">Cargando datos...</div>
+            <div id="driveStatus" class="data-status" style="display: none;"></div>
             
             <section class="dashboard">
                 <div class="card today-reviews"><h3><i class="icon"></i>Revisiones de Hoy</h3><div class="reviews-list" id="todayReviews"></div></div>
@@ -166,6 +174,12 @@
                 <button class="btn" onclick="exportToExcel()">📊 Exportar a Excel</button>
                 <button class="btn btn-info" onclick="exportData()">💾 Exportar JSON</button>
                 <button class="btn btn-warning" onclick="importData()">📥 Importar Datos</button>
+            </section>
+
+            <section style="text-align: center; margin-bottom: 30px; border-top: 1px solid #ddd; padding-top: 20px;">
+                <button id="connectDriveBtn" class="btn">🔗 Conectar a Drive</button>
+                <button id="saveToDriveBtn" class="btn btn-success" style="display:none;">📤 Guardar en Drive</button>
+                <button id="loadFromDriveBtn" class="btn btn-warning" style="display:none;">📥 Cargar de Drive</button>
             </section>
             
             <section class="filter-bar">
@@ -181,14 +195,16 @@
     </div>
 
     <input type="file" id="importInput" accept=".json" style="display: none;" onchange="handleImport(event)">
+    <input type="file" id="documentUploadInput" style="display: none;">
 
     <div id="newClaimModal" class="modal"><div class="modal-content"></div></div>
     <div id="claimSelectorModal" class="modal"><div class="modal-content"></div></div>
     <div id="claimInfoModal" class="modal"><div class="modal-content"></div></div>
+    <div id="documentModal" class="modal"><div class="modal-content"></div></div>
     
     <script>
         let claimsData = [];
-        let editingClaimId = null, editingField = null;
+        let editingClaimId = null, editingField = null, currentClaimIdForDocs = null;
 
         function saveData() {
             localStorage.setItem('planilla_siniestros_data', JSON.stringify(claimsData));
@@ -344,6 +360,7 @@
                 </div>
                 <form class="form-group" onsubmit="addObservation(event, '${claim.id}')" style="background: var(--light-bg); padding: 20px; border-radius: 8px;"><h4>➕ Agregar Tarea/Observación</h4><div class="form-group"><label>Texto</label><textarea id="newObsText" rows="2" required></textarea></div><div class="form-group"><label>Fecha de Revisión</label><input type="date" id="newRevisionDate" required></div><button type="submit" class="btn btn-success">💾 Guardar Tarea</button></form>
                 <div class="action-buttons">
+                    <button class="btn btn-info" onclick="showDocumentModal('${claim.id}')">📁 Gestionar Documentos</button>
                     <button class="btn" onclick="printClaimSheet('${claim.id}')">🖨️ Imprimir Ficha</button>
                     <button class="btn" onclick="printClaimHistory('${claim.id}')">📜 Imprimir Historial</button>
                     <button class="btn btn-danger" onclick="deleteClaim('${claim.id}')">🗑️ Eliminar Siniestro</button>
@@ -498,10 +515,10 @@
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('newClaimModal').querySelector('.modal-content').innerHTML = `<span class="close" onclick="closeModal('newClaimModal')">&times;</span><h2>➕ Agregar Nuevo Siniestro</h2><form id="newClaimForm"><div class="info-grid" style="grid-template-columns: 1fr 1fr;"><div class="form-group"><label>Cliente *</label><input type="text" id="newCliente" required></div><div class="form-group"><label>DNI</label><input type="text" id="newDni"></div><div class="form-group"><label>Celular</label><input type="text" id="newCelular"></div><div class="form-group"><label>Asegurado en</label><input type="text" id="newAseguradoEn"></div><div class="form-group"><label>Cia. Contraria</label><input type="text" id="newContra"></div><div class="form-group"><label>N° Reclamo</label><input type="text" id="newNumeroReclamo"></div><div class="form-group"><label>Presupuesto</label><input type="text" id="newPresupuesto"></div><div class="form-group"><label>Indemnización</label><input type="text" id="newIndemnizacion"></div><div class="form-group"><label>Honorarios</label><input type="text" id="newHonorarios"></div><div class="form-group"><label>Acuerdo</label><input type="text" id="newAcuerdo"></div><div class="form-group"><label>Fecha Pago</label><input type="date" id="newFechaPago"></div><div class="form-group"><label>Factura</label><input type="text" id="newFactura"></div><div class="form-group"><label>Estado *</label><select id="newEstado" required><option value="EJECUCION">Ejecución</option><option value="FINALIZADA">Finalizada</option><option value="RECHAZADO">Rechazado</option><option value="DEMORADA">Demorada</option></select></div></div><div class="form-group" style="margin-top:20px;"><label>Observación Inicial (Opcional)</label><textarea id="newObservacion" rows="3"></textarea></div><div class="form-group"><label>Fecha de Revisión para Tarea Inicial</label><input type="date" id="newFechaRevision"></div><div style="text-align:center;"><button type="submit" class="btn btn-success">💾 Guardar Siniestro</button></div></form>`;
             document.getElementById('claimSelectorModal').querySelector('.modal-content').innerHTML = `<span class="close" onclick="closeModal('claimSelectorModal')">&times;</span><h2>👁️ Seleccionar Siniestro</h2><div class="form-group"><select id="claimSelector" onchange="loadClaimInfo()"></select></div>`;
+            document.getElementById('documentModal').querySelector('.modal-content').innerHTML = `<span class="close" onclick="closeModal('documentModal')">&times;</span><h2 id="documentModalTitle"></h2><ul id="documentList" class="document-list"></ul><div style="text-align: center; margin-top: 20px;"><button class="btn btn-info" onclick="triggerDocumentUpload()">➕ Subir Documento</button></div>`;
             
             document.getElementById('newClaimForm').addEventListener('submit', function(e) {
                 e.preventDefault();
-                
                 const newClaim = {
                     id: generateId({}),
                     cliente: document.getElementById('newCliente').value.toUpperCase(),
@@ -522,13 +539,7 @@
                 const obsText = document.getElementById('newObservacion').value;
                 const revDate = document.getElementById('newFechaRevision').value;
                 if (obsText && revDate) {
-                    newClaim.observaciones.push({
-                        id: generateId({}),
-                        fecha: getTodayYMD(),
-                        texto: obsText,
-                        proximaRevision: revDate,
-                        completed: false
-                    });
+                    newClaim.observaciones.push({ id: generateId({}), fecha: getTodayYMD(), texto: obsText, proximaRevision: revDate, completed: false });
                 }
                 updateClaimNextRevision(newClaim);
                 claimsData.push(newClaim);
@@ -542,6 +553,138 @@
             renderAll();
         });
         window.addEventListener('click', e => { if (e.target.classList.contains('modal')) closeModal(e.target.id); });
+    </script>
+    
+    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+    <script>
+        const CLIENT_ID = '976943805178-lr5pvivhpstfnjp4leoolopo0kvb1cif.apps.googleusercontent.com';
+        const API_KEY = 'AIzaSyDSMWMM3lJM4ZNqRezhH-8uxaE1GVOjrrM';
+        const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+        const DATA_FILE_NAME = 'datos_planilla_siniestros.json';
+        const DOCS_FOLDER_NAME = 'Planilla_Siniestros_Documentos';
+
+        let tokenClient, gapiInited = false, gisInited = false, dataFileId = null, docsFolderId = null;
+        const driveStatusEl = document.getElementById('driveStatus'), connectDriveBtn = document.getElementById('connectDriveBtn'), saveToDriveBtn = document.getElementById('saveToDriveBtn'), loadFromDriveBtn = document.getElementById('loadFromDriveBtn');
+
+        function gapiLoaded() { gapi.load('client', initializeGapiClient); }
+        async function initializeGapiClient() { await gapi.client.init({ apiKey: API_KEY, discoveryDocs: [DISCOVERY_DOC] }); gapiInited = true; maybeEnableButtons(); }
+        function gisLoaded() { tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: '' }); gisInited = true; maybeEnableButtons(); }
+        function maybeEnableButtons() { if (gapiInited && gisInited) connectDriveBtn.onclick = handleAuthClick; }
+        function updateDriveStatus(message, isConnected = false) { driveStatusEl.style.display = 'block'; driveStatusEl.textContent = message; driveStatusEl.style.background = isConnected ? '#d1e7dd' : '#fff3cd'; driveStatusEl.style.color = isConnected ? '#0f5132' : '#664d03'; }
+
+        function handleAuthClick() {
+            tokenClient.callback = async (resp) => {
+                if (resp.error) throw (resp);
+                updateDriveStatus('✅ Conectado a Google Drive', true);
+                connectDriveBtn.style.display = 'none'; saveToDriveBtn.style.display = 'inline-block'; loadFromDriveBtn.style.display = 'inline-block';
+                saveToDriveBtn.onclick = saveDataToDrive; loadFromDriveBtn.onclick = loadDataFromDrive;
+                await findDataFile();
+            };
+            if (gapi.client.getToken() === null) tokenClient.requestAccessToken({prompt: 'consent'}); else tokenClient.requestAccessToken({prompt: ''});
+        }
+        async function findDataFile() {
+            updateDriveStatus('Buscando archivo de datos en Drive...', false);
+            try {
+                const response = await gapi.client.drive.files.list({ q: `name='${DATA_FILE_NAME}' and trashed=false`, fields: 'files(id, name)', spaces: 'drive' });
+                if (response.result.files.length > 0) { dataFileId = response.result.files[0].id; updateDriveStatus('✅ Archivo de datos encontrado en Drive.', true); }
+                else { updateDriveStatus('⚠️ Archivo no encontrado. Se creará uno nuevo al guardar.', false); dataFileId = null; }
+            } catch (err) { console.error(err); alert('Error al buscar el archivo de datos en Drive.'); }
+        }
+        async function saveDataToDrive() {
+            if (!confirm('¿Guardar los datos actuales en Google Drive? Esto sobreescribirá la versión anterior en la nube.')) return;
+            updateDriveStatus('Guardando datos en Drive...', false);
+            try {
+                const content = JSON.stringify(claimsData, null, 2);
+                dataFileId = await uploadContent(content, DATA_FILE_NAME, 'application/json', null, dataFileId);
+                updateDriveStatus('✅ ¡Datos guardados en Drive con éxito!', true);
+            } catch (err) { console.error(err); updateDriveStatus('❌ Error al guardar en Drive.', false); }
+        }
+        async function loadDataFromDrive() {
+            if (!dataFileId) return alert("No se ha encontrado un archivo de datos. Guarda primero para crear uno.");
+            if (!confirm("¿Seguro? Se reemplazarán los datos locales con los de Drive.")) return;
+            updateDriveStatus('Cargando datos desde Drive...', false);
+            try {
+                const response = await gapi.client.drive.files.get({ fileId: dataFileId, alt: 'media' });
+                const importedData = JSON.parse(response.body);
+                if (!Array.isArray(importedData)) throw new Error('Formato no válido.');
+                claimsData = importedData;
+                saveData();
+                loadData();
+                renderAll();
+                updateDriveStatus('✅ Datos cargados desde Drive con éxito.', true);
+            } catch (err) { console.error(err); updateDriveStatus('❌ Error al cargar desde Drive.', false); alert('Error al cargar desde Drive: ' + err.message); }
+        }
+        async function getOrCreateFolder(name, parentId = null) {
+            let query = `mimeType='application/vnd.google-apps.folder' and name='${name}' and trashed=false`;
+            if (parentId) query += ` and '${parentId}' in parents`;
+            const response = await gapi.client.drive.files.list({ q: query, fields: 'files(id)' });
+            if (response.result.files.length > 0) return response.result.files[0].id;
+            const fileMetadata = { name, mimeType: 'application/vnd.google-apps.folder', ...(parentId && {parents: [parentId]}) };
+            const newFolder = await gapi.client.drive.files.create({ resource: fileMetadata, fields: 'id' });
+            return newFolder.result.id;
+        }
+        async function showDocumentModal(claimId) {
+            if (gapi.client.getToken() === null) return alert('Conecta con Google Drive primero.');
+            currentClaimIdForDocs = claimId;
+            const claim = claimsData.find(c => c.id === claimId);
+            if (!claim) return;
+            document.getElementById('documentModalTitle').innerText = `Documentos de: ${getDisplayName(claim)}`;
+            document.getElementById('documentModal').classList.add('active');
+            const listEl = document.getElementById('documentList');
+            listEl.innerHTML = '<div class="spinner"></div>';
+            try {
+                if (!docsFolderId) docsFolderId = await getOrCreateFolder(DOCS_FOLDER_NAME);
+                const clientFolderName = `${claim.cliente.replace(/[\/\\?%*:|"<>]/g, '-')} - Reclamo ${claim.numeroReclamo || claim.id.slice(-4)}`;
+                const clientFolderId = await getOrCreateFolder(clientFolderName, docsFolderId);
+                const response = await gapi.client.drive.files.list({ q: `'${clientFolderId}' in parents and trashed=false`, fields: 'files(id, name, webViewLink)' });
+                listEl.innerHTML = response.result.files.length === 0 ? '<li>No hay documentos.</li>' : response.result.files.map(file => `<li><a href="${file.webViewLink}" target="_blank">${file.name}</a><button class="btn btn-danger btn-sm" onclick="deleteDocument('${file.id}')">X</button></li>`).join('');
+            } catch (err) { console.error(err); listEl.innerHTML = '<li>Error al cargar documentos.</li>'; }
+        }
+        async function deleteDocument(fileId) { if (confirm('¿Eliminar este documento permanentemente de Google Drive?')) try { await gapi.client.drive.files.delete({ fileId }); showDocumentModal(currentClaimIdForDocs); } catch (err) { alert('Error al eliminar.'); } }
+        function triggerDocumentUpload() { const uploader = document.getElementById('documentUploadInput'); uploader.onchange = handleDocumentUpload; uploader.value = ''; uploader.click(); }
+        async function handleDocumentUpload(event) {
+            const file = event.target.files[0]; if (!file) return;
+            const listEl = document.getElementById('documentList');
+            listEl.innerHTML = '<div class="spinner"></div><p style="text-align:center;">Subiendo...</p>';
+            try {
+                const claim = claimsData.find(c => c.id === currentClaimIdForDocs);
+                if (!docsFolderId) docsFolderId = await getOrCreateFolder(DOCS_FOLDER_NAME);
+                const clientFolderName = `${claim.cliente.replace(/[\/\\?%*:|"<>]/g, '-')} - Reclamo ${claim.numeroReclamo || claim.id.slice(-4)}`;
+                const clientFolderId = await getOrCreateFolder(clientFolderName, docsFolderId);
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    await uploadContent(e.target.result, file.name, file.type, clientFolderId, null);
+                    showDocumentModal(currentClaimIdForDocs);
+                };
+                reader.readAsArrayBuffer(file);
+            } catch (err) { console.error(err); alert("Error al subir."); showDocumentModal(currentClaimIdForDocs); }
+        }
+        async function uploadContent(content, fileName, mimeType, parentId, fileIdToUpdate) {
+            const boundary = '-------314159265358979323846';
+            const metadata = { name: fileName, mimeType: mimeType, ...(parentId && { parents: [parentId] }) };
+            const base64Data = content instanceof ArrayBuffer ? btoa(String.fromCharCode.apply(null, new Uint8Array(content))) : btoa(unescape(encodeURIComponent(content)));
+            const requestBody =
+                `--${boundary}\r\n` +
+                `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+                JSON.stringify(metadata) +
+                `\r\n--${boundary}\r\n` +
+                `Content-Type: ${mimeType}\r\n` +
+                `Content-Transfer-Encoding: base64\r\n\r\n` +
+                base64Data +
+                `\r\n--${boundary}--`;
+            
+            const request = gapi.client.request({
+                path: fileIdToUpdate ? `/upload/drive/v3/files/${fileIdToUpdate}` : '/upload/drive/v3/files',
+                method: fileIdToUpdate ? 'PATCH' : 'POST',
+                params: { uploadType: 'multipart' },
+                headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+                body: requestBody
+            });
+            const response = await request;
+            return response.result.id;
+        }
     </script>
 </body>
 </html>
