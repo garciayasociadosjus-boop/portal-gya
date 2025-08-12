@@ -142,6 +142,18 @@
         .document-list .btn-sm { flex-shrink: 0; margin-left: 10px; }
         .document-list .spinner { display: block; margin: 20px auto; width: 30px; height: 30px; border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* --- ESTILOS DE IMPRESIÓN --- */
+        @media print {
+            body * { visibility: hidden; }
+            .print-area, .print-area * { visibility: visible; }
+            .print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; }
+            .print-area h2, .print-area h3, .print-area h4 { margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 5px;}
+            .print-area .info-grid { display: block; }
+            .print-area .info-item { border: 1px solid #eee; padding: 8px; margin-bottom: 5px; page-break-inside: avoid; }
+            .print-area .history-item { border: 1px solid #eee; padding: 8px; margin-bottom: 5px; page-break-inside: avoid; }
+            .print-area .btn, .print-area .no-print { display: none; }
+        }
     </style>
 </head>
 <body>
@@ -399,6 +411,8 @@
                 </div>
                 <div class="action-buttons">
                     <button class="btn btn-info" onclick="showDocumentModal('${client.id}')">📁 Gestionar Documentos</button>
+                    <button class="btn" onclick="printClientSheet('${client.id}')">🖨️ Imprimir Ficha</button>
+                    <button class="btn" onclick="printClientHistory('${client.id}')">📜 Imprimir Historial</button>
                     <button class="btn btn-danger" onclick="deleteClient('${client.id}')">🗑️ Eliminar Caso</button>
                 </div>`;
             document.getElementById('clientInfoModal').querySelector('.modal-content').innerHTML = content;
@@ -524,6 +538,65 @@
             const reader = new FileReader();
             reader.onload = e => { try { const imported = JSON.parse(e.target.result); if (Array.isArray(imported) && confirm(`¿Importar ${imported.length} casos? Esto sobreescribirá los datos actuales.`)) { clientsData = imported; saveData(); loadData(); renderAll(); } } catch (err) { alert('Error al importar el archivo. Verifique que sea un JSON válido.'); } };
             reader.readAsText(file); event.target.value = '';
+        }
+
+        function printClientSheet(clientId) {
+            const client = clientsData.find(c => c.id === clientId);
+            if (!client) return;
+            const printContent = `
+                <div class="print-area">
+                    <h2>Ficha del Caso</h2>
+                    <h3>${getDisplayName(client)}</h3>
+                    <div class="info-grid">
+                        ${Object.entries({nombre: 'Nombre', dni: 'DNI', telefono: 'Teléfono', caratula: 'Carátula', expediente: 'N° Expediente', juzgado: 'Juzgado', direccionJuzgado: 'Dirección Juzgado', telJuzgado: 'Tel. Juzgado', estado: 'Estado', audiencias: 'Audiencias (Campo Antiguo)'}).map(([key, label]) => `
+                        <div class="info-item">
+                            <div class="info-label">${label}</div>
+                            <div class="info-value">${client[key] || 'S/D'}</div>
+                        </div>`).join('')}
+                    </div>
+                </div>
+            `;
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`<html><head><title>Ficha del Cliente</title><style>${document.querySelector("style").innerHTML}</style></head><body>${printContent}</body></html>`);
+            printWindow.document.close();
+            setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
+        }
+
+        function printClientHistory(clientId) {
+            const client = clientsData.find(c => c.id === clientId);
+            if (!client) return;
+            const historyHTML = renderHistoryListForPrint(client);
+            const printContent = `
+                <div class="print-area">
+                    <h2>Historial de Actuaciones</h2>
+                    <h3>${getDisplayName(client)}</h3>
+                    ${historyHTML}
+                </div>
+            `;
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`<html><head><title>Historial del Caso</title><style>${document.querySelector("style").innerHTML}</style></head><body>${printContent}</body></html>`);
+            printWindow.document.close();
+            setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
+        }
+
+        function renderHistoryListForPrint(client) {
+            const tasks = (client.observaciones || []).map(obs => ({ ...obs, date: obs.proximaRevision, type: 'task' }));
+            const audiences = (client.audiencias_list || []).map(aud => ({ ...aud, date: aud.fecha, type: 'audience' }));
+            const combinedHistory = [...tasks, ...audiences].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+            return combinedHistory.length === 0 ? '<p>No hay tareas ni audiencias registradas.</p>' : combinedHistory.map(item => {
+                if (item.type === 'task') {
+                    return `<div class="history-item history-item-task ${item.completed ? 'completed' : ''}">
+                        <div class="history-date">Revisar el: ${formatDate(item.proximaRevision)} <span class="history-tag tag-task">TAREA</span></div>
+                        <div class="history-text">${item.texto}</div>
+                    </div>`;
+                } else {
+                    return `<div class="history-item history-item-audience">
+                        <div class="history-date">Fecha: ${formatDate(item.fecha)} <span class="history-tag tag-audience">AUDIENCIA</span></div>
+                        <div class="history-text">${item.texto}</div>
+                    </div>`;
+                }
+            }).join('');
         }
         
         document.addEventListener('DOMContentLoaded', () => {
