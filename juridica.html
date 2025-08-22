@@ -263,6 +263,10 @@
                     obs.id = obs.id || generateId({});
                     obs.completed = typeof obs.completed === 'boolean' ? obs.completed : false;
                 });
+                c.audiencias_list.forEach(aud => {
+                    aud.id = aud.id || generateId({});
+                    aud.completed = typeof aud.completed === 'boolean' ? aud.completed : false;
+                });
                 updateClientNextRevision(c);
             });
             return data;
@@ -293,9 +297,11 @@
             if (futureObs.length > 0) {
                 client.proximaRevision = futureObs[0].proximaRevision;
                 client.observacion = futureObs[0].texto;
+                client.fechaTrabajado = futureObs[0].fecha;
             } else {
                 client.proximaRevision = '';
                 client.observacion = 'No hay tareas pendientes';
+                client.fechaTrabajado = '';
             }
         }
 
@@ -307,6 +313,17 @@
             if (!obs) return;
             obs.completed = !obs.completed;
             updateClientNextRevision(client);
+            saveData();
+            renderAll();
+        }
+
+        function toggleAudienceCompleted(event, clientId, audId) {
+            event.stopPropagation();
+            const client = clientsData.find(c => c.id === clientId);
+            if (!client) return;
+            const aud = client.audiencias_list.find(a => a.id === audId);
+            if (!aud) return;
+            aud.completed = !aud.completed;
             saveData();
             renderAll();
         }
@@ -323,13 +340,13 @@
                     .filter(obs => !obs.completed && obs.proximaRevision)
                     .map(obs => ({
                         id: obs.id, client: client, reviewDate: obs.proximaRevision,
-                        reviewText: obs.texto, isCompletable: true, type: 'task'
+                        reviewText: obs.texto, isCompletable: true, type: 'task', completed: obs.completed
                     }));
                 const audiences = (client.audiencias_list || [])
-                    .filter(aud => aud.fecha)
+                    .filter(aud => aud.fecha && !aud.completed)
                     .map(aud => ({
                         id: aud.id, client: client, reviewDate: aud.fecha,
-                        reviewText: `AUDIENCIA: ${aud.texto}`, isCompletable: false, type: 'audience'
+                        reviewText: `AUDIENCIA: ${aud.texto}`, isCompletable: true, type: 'audience', completed: aud.completed
                     }));
                 return [...tasks, ...audiences];
             });
@@ -352,9 +369,11 @@
                 else if (type === 'overdue') dateInfo = `VENCIDA - ${formatDate(item.reviewDate)}`;
                 else dateInfo = `En ${getDaysDifference(item.reviewDate)} días - ${formatDate(item.reviewDate)}`;
                 
-                const completeButton = item.isCompletable ? `<button class="complete-btn" onclick="toggleCompleted(event, '${item.client.id}', '${item.id}')">✔</button>` : `<div style="width:30px; flex-shrink:0;"></div>`;
+                const toggleFunc = item.type === 'task' ? 'toggleCompleted' : 'toggleAudienceCompleted';
+                const completedClass = item.completed ? 'completed' : '';
+                const completeButton = item.isCompletable ? `<button class="complete-btn" onclick="${toggleFunc}(event, '${item.client.id}', '${item.id}')">✔</button>` : `<div style="width:30px; flex-shrink:0;"></div>`;
                 
-                return `<div class="review-item">${completeButton}<div class="review-item-content" onclick="showClientModal('${item.client.id}')"><div class="review-date">${dateInfo}</div><div class="review-client">${item.client.nombre} | ${item.client.caratula || 'Sin Carátula'}</div><div class="review-obs">${item.reviewText}</div></div></div>`;
+                return `<div class="review-item ${completedClass}">${completeButton}<div class="review-item-content" onclick="showClientModal('${item.client.id}')"><div class="review-date">${dateInfo}</div><div class="review-client">${item.client.nombre} | ${item.client.caratula || 'Sin Carátula'}</div><div class="review-obs">${item.reviewText}</div></div></div>`;
             }).join('');
         }
         
@@ -371,7 +390,7 @@
             document.getElementById('allClients').innerHTML = filteredData.length === 0 ? '<p>No se encontraron casos.</p>' : filteredData.map(c => {
                 const hasPendingTask = (c.observaciones || []).some(obs => !obs.completed && obs.proximaRevision);
                 const classes = `review-item ${!hasPendingTask ? 'completed' : ''} ${isToday(c.proximaRevision) ? 'today' : ''} ${isPastDue(c.proximaRevision) ? 'overdue' : ''}`;
-                return `<div class="${classes}" onclick="showClientModal('${c.id}')"><div class="review-item-content"><div class="review-date">Próx. Revisión: ${formatDate(c.proximaRevision)}</div><div class="review-client">${getDisplayName(c)}</div><div class="review-obs">Últ. Tarea: ${c.observacion}</div></div></div>`;
+                return `<div class="${classes}" onclick="showClientModal('${c.id}')"><div class="review-item-content"><div class="review-date">Próx. Revisión: ${formatDate(c.proximaRevision)}</div>${c.fechaTrabajado ? `<div style="font-size:0.85em; color:#444; margin-top: 3px;">Trabajado el: ${formatDate(c.fechaTrabajado)}</div>` : ''}<div class="review-client">${getDisplayName(c)}</div><div class="review-obs">Últ. Tarea: ${c.observacion}</div></div></div>`;
             }).join('');
         }
 
@@ -427,13 +446,17 @@
             return combinedHistory.length === 0 ? '<p>No hay tareas ni audiencias registradas.</p>' : combinedHistory.map(item => {
                 if (item.type === 'task') {
                     return `<div id="task-item-${item.id}" class="history-item history-item-task ${item.completed ? 'completed' : ''}">
-                        <div class="history-date">Revisar el: ${formatDate(item.proximaRevision)} <span class="history-tag tag-task">TAREA</span></div>
+                        <div class="history-date">
+                            Revisar el: ${formatDate(item.proximaRevision)}
+                            ${item.fecha ? `<span style="font-weight: normal; color: #444; margin-left: 10px;">(Trabajado el: ${formatDate(item.fecha)})</span>` : ''}
+                            <span class="history-tag tag-task" style="margin-left: auto;">TAREA</span>
+                        </div>
                         <div class="history-text">${item.texto}</div>
                         <button class="btn btn-sm" onclick="editObs('${client.id}', '${item.id}')">Editar</button>
                         <button class="btn btn-danger btn-sm" onclick="deleteObs('${client.id}', '${item.id}')">Eliminar</button>
                     </div>`;
                 } else { // type === 'audience'
-                    return `<div class="history-item history-item-audience">
+                    return `<div class="history-item history-item-audience ${item.completed ? 'completed' : ''}">
                         <div class="history-date">Fecha: ${formatDate(item.fecha)} <span class="history-tag tag-audience">AUDIENCIA</span></div>
                         <div class="history-text">${item.texto}</div>
                         <button class="btn btn-danger btn-sm" onclick="deleteAudience('${client.id}', '${item.id}')">Eliminar</button>
@@ -458,6 +481,7 @@
             const obs = client.observaciones.find(o => o.id === obsId);
             obs.texto = document.getElementById(`edit-obs-text-${obsId}`).value;
             obs.proximaRevision = document.getElementById(`edit-obs-revision-${obsId}`).value;
+            obs.fecha = getTodayYMD(); // ACTUALIZA LA FECHA DE TRABAJO
             updateClientNextRevision(client);
             saveData();
             renderAll();
@@ -515,7 +539,7 @@
             const client = clientsData.find(c => c.id === clientId);
             if (!client) return;
             if (!client.audiencias_list) client.audiencias_list = [];
-            client.audiencias_list.push({ id: generateId({}), fecha: document.getElementById('newAudienceDate').value, texto: document.getElementById('newAudienceText').value });
+            client.audiencias_list.push({ id: generateId({}), fecha: document.getElementById('newAudienceDate').value, texto: document.getElementById('newAudienceText').value, completed: false });
             saveData(); renderAll(); showClientModal(clientId);
         }
 
@@ -586,7 +610,11 @@
             return combinedHistory.length === 0 ? '<p>No hay tareas ni audiencias registradas.</p>' : combinedHistory.map(item => {
                 if (item.type === 'task') {
                     return `<div class="history-item history-item-task ${item.completed ? 'completed' : ''}">
-                        <div class="history-date">Revisar el: ${formatDate(item.proximaRevision)} <span class="history-tag tag-task">TAREA</span></div>
+                        <div class="history-date">
+                            Revisar el: ${formatDate(item.proximaRevision)}
+                            ${item.fecha ? `(Trabajado el: ${formatDate(item.fecha)})` : ''}
+                            <span class="history-tag tag-task">TAREA</span>
+                        </div>
                         <div class="history-text">${item.texto}</div>
                     </div>`;
                 } else {
