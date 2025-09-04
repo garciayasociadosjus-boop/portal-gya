@@ -891,6 +891,11 @@
         }
         async function deleteDocument(fileId) { if (confirm('¿Eliminar este documento permanentemente de Google Drive?')) try { await gapi.client.drive.files.delete({ fileId }); showDocumentModal(currentClientIdForDocs); } catch (err) { alert('Error al eliminar.'); } }
         function triggerDocumentUpload() { const uploader = document.getElementById('documentUploadInput'); uploader.onchange = handleDocumentUpload; uploader.value = ''; uploader.click(); }
+        
+        // ======================================================
+        // AQUI COMIENZAN LAS FUNCIONES CORREGIDAS
+        // ======================================================
+
         async function handleDocumentUpload(event) {
             const file = event.target.files[0]; if (!file) return;
             const listEl = document.getElementById('documentList');
@@ -902,16 +907,30 @@
                 const clientFolderId = await getOrCreateFolder(clientFolderName, docsFolderId);
                 const reader = new FileReader();
                 reader.onload = async (e) => {
+                    // El resultado ya es un DataURL (string Base64)
                     await uploadContent(e.target.result, file.name, file.type, clientFolderId, null);
                     showDocumentModal(currentClientIdForDocs);
                 };
-                reader.readAsArrayBuffer(file);
+                // CAMBIO PRINCIPAL: Leer el archivo como DataURL
+                reader.readAsDataURL(file);
             } catch (err) { console.error(err); alert("Error al subir."); showDocumentModal(currentClientIdForDocs); }
         }
+
         async function uploadContent(content, fileName, mimeType, parentId, fileIdToUpdate) {
             const boundary = '-------314159265358979323846';
-            const metadata = { name: fileName, mimeType: mimeType, ...(parentId && { parents: [parentId] }) };
-            const base64Data = content instanceof ArrayBuffer ? btoa(String.fromCharCode.apply(null, new Uint8Array(content))) : btoa(unescape(encodeURIComponent(content)));
+            const metadata = { name: fileName, mimeType: mimeType, ...(parentId && !fileIdToUpdate && { parents: [parentId] }) };
+
+            // CAMBIO PRINCIPAL: Determinar si el contenido es un DataURL (un archivo)
+            // o un string JSON (el backup de datos).
+            let base64Data;
+            if (typeof content === 'string' && content.startsWith('data:')) {
+                // Es un archivo (DataURL), extraemos solo la parte Base64.
+                base64Data = content.split(',')[1];
+            } else {
+                // Es el backup de datos (string JSON), lo codificamos a Base64.
+                base64Data = btoa(unescape(encodeURIComponent(content)));
+            }
+
             const requestBody =
                 `--${boundary}\r\n` +
                 `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
@@ -932,6 +951,11 @@
             const response = await request;
             return response.result.id;
         }
+
+        // ======================================================
+        // AQUI TERMINAN LAS FUNCIONES CORREGIDAS
+        // ======================================================
+
     </script>
     
 </body>
